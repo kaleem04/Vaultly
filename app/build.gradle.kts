@@ -60,7 +60,8 @@ dependencies {
     implementation("com.google.accompanist:accompanist-navigation-material:0.36.0")
     //compose navigation
     implementation("androidx.navigation:navigation-compose:2.9.4")
-
+    //DataStore
+    implementation("androidx.datastore:datastore-preferences:1.1.7")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)

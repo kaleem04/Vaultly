@@ -1,37 +1,170 @@
 package com.dapp.vaultly.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.dapp.vaultly.VaultDockedSearchBar
 
 
 @Composable
 fun DashboardScreen(
-    onLogout: ()-> Unit,
+    onItemClick: (VaultItem) -> Unit = {},
+    onLogoutClick: () -> Unit = {},
+    search: Boolean = false,
+    contentPaddingValues: PaddingValues = PaddingValues(0.dp),
+    modifier: Modifier = Modifier,
 ) {
+    var query by remember { mutableStateOf("") }
     Column(
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp)
-    ) {
-        Text(
-            text = "Dashboard Screen"
-        )
+            .padding(contentPaddingValues)
 
-        Button(onClick= onLogout ){
-            Text(
-                text = "Logout"
+    ) {
+        if (search) {
+            VaultDockedSearchBar(
+                query = query,
+                onQueryChange = { query = it },
+                onSearch = { /* filter Vault items */ }
             )
         }
+        // 🔹 Categories
+        LazyRow(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            items(listOf("Passwords", "Notes", "Cards", "IDs")) { category ->
+                FilterChip(category, onClick = { /* filter */ })
+            }
+        }
+
+        // 🔹 Vault items (grid like LastPass)
+        LazyColumn(
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            items(sampleVaultItems) { item ->
+                VaultCard(item, onClick = { onItemClick(item) })
+            }
+            item {
+                Button(
+                    onClick = onLogoutClick
+                ) {
+                    Text(text = "Logout")
+                }
+            }
+        }
     }
+}
+
+@Composable
+fun FilterChip(label: String, onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .padding(end = 8.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(50),
+        shadowElevation = 2.dp
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@Composable
+fun VaultCard(item: VaultItem, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(10.dp),
+        elevation = CardDefaults.cardElevation(4.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp)
+        ) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(5.dp),
+                modifier = Modifier.weight(0.8f)
+            ) {
+                Text(item.title, style = MaterialTheme.typography.titleMedium)
+                Text(item.userName, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+
+            }
+
+            IconButton(
+                onClick = {},
+                modifier = Modifier.weight(0.2f)
+            ) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = null
+                )
+            }
+
+        }
+    }
+}
+
+
+data class VaultItem(
+    val title: String,
+    val userName: String = "",
+    val password: String = "",
+    val note: String = "",
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+val sampleVaultItems = listOf(
+    VaultItem("Gmail sgwrgergege", "user@gmail.comegrgegegegesgeg"),
+    VaultItem("Facebookgregeg", "user123"),
+    VaultItem("Bank", "****1234"),
+    VaultItem("Work Email", "work@company.com"),
+    VaultItem("Github", "devUser"),
+    VaultItem("Netflix", "user@mail.com"),
+    VaultItem("Bank", "****1234"),
+    VaultItem("Work Email", "work@company.com"),
+    VaultItem("Github", "devUser"),
+    VaultItem("Netflix", "user@mail.com"),
+)
+
+@Preview(showBackground = true)
+@Composable
+private fun VaultItemPreview() {
+    VaultCard(
+        item = VaultItem("Gmail sgwrgergege", "user@gmail.comegrgegegegesgeg"),
+        onClick = {}
+    )
 }
