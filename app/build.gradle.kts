@@ -41,7 +41,7 @@ android {
     buildFeatures {
         compose = true
     }
-    packagingOptions {
+    packaging {
         resources {
             pickFirsts += "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
         }
@@ -50,7 +50,6 @@ android {
 
 dependencies {
     val boomVersion ="1.4.11"
-    val reownCore = "1.4.11"
     //Appkit
     implementation(platform("com.reown:android-bom:$boomVersion"))
     // Core SDK

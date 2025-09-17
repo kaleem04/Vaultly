@@ -1,6 +1,7 @@
 package com.dapp.vaultly
 
 import android.annotation.SuppressLint
+import android.util.Log
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
@@ -13,29 +14,32 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.dapp.vaultly.data.model.VaultlyRoutes
+import com.dapp.vaultly.ui.screens.DashboardScreen
 import com.dapp.vaultly.ui.screens.WelcomeScreen
 import com.dapp.vaultly.util.NavigationEvent
 import com.google.accompanist.navigation.material.ExperimentalMaterialNavigationApi
+import com.reown.appkit.client.AppKit
 import com.reown.appkit.ui.components.internal.AppKitComponent
-import kotlinx.coroutines.launch
 
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialNavigationApi::class)
-@Preview(showBackground = true)
+
 @Composable
-fun VaultlyApp() {
+fun VaultlyApp(
+    isSessionAlive: Boolean
+) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
     val modalSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var openNetworks by rememberSaveable { mutableStateOf(false) }
     val navController = rememberNavController()
+
     Scaffold(
 
     ) {
@@ -43,9 +47,7 @@ fun VaultlyApp() {
         LaunchedEffect(Unit) {
             NavigationEvent.navigationEvents.collect { route ->
                 if (route == VaultlyRoutes.DASHBOARDSCREEN.name) {
-                    navController.navigate( VaultlyRoutes.DASHBOARDSCREEN.name) {
-                        popUpTo(VaultlyRoutes.WELCOMESCREEN.name) { inclusive = true }
-                    }
+                    navController.navigate(VaultlyRoutes.DASHBOARDSCREEN.name)
                 }
             }
         }
@@ -62,10 +64,21 @@ fun VaultlyApp() {
             composable(VaultlyRoutes.VAULTLYBOTTOMSHEET.name) {
                 VaultlyBottomSheet(
                     onDismiss = {
-                       navController.popBackStack()
+                        navController.popBackStack()
                     },
 
-                )
+                    )
+            }
+            composable(VaultlyRoutes.DASHBOARDSCREEN.name) {
+                DashboardScreen() {
+                    AppKit.disconnect(
+                        onSuccess = {
+                            Log.d("@@", "Disconnection Successfull")
+                        }, onError = {
+                            Log.d("@@", "Disconnection Failed")
+                        }
+                    )
+                }
             }
         }
 
@@ -87,7 +100,7 @@ fun VaultlyBottomSheet(
         AppKitComponent(
             false,
 
-        ){
+            ) {
             onDismiss()
         }
     }
