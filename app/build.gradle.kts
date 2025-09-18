@@ -4,6 +4,8 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    id("com.google.devtools.ksp")
+    id("com.google.dagger.hilt.android")
 }
 
 android {
@@ -50,6 +52,19 @@ android {
 
 dependencies {
     val boomVersion ="1.4.11"
+    val roomVersion = "2.8.0"
+    //retrofit
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    //gson converter
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+// Or the latest stable version
+    //hilt
+    implementation("com.google.dagger:hilt-android:2.57.1")
+    ksp("com.google.dagger:hilt-android-compiler:2.57.1")
+    implementation("androidx.hilt:hilt-navigation-compose:1.3.0")
+    //Room database
+    ksp("androidx.room:room-compiler:$roomVersion")
+    implementation("androidx.room:room-runtime:${roomVersion}")
     //Appkit
     implementation(platform("com.reown:android-bom:$boomVersion"))
     // Core SDK

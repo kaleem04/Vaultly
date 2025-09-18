@@ -17,11 +17,13 @@ import com.reown.appkit.client.Modal
 import com.reown.appkit.client.models.request.Request
 import com.reown.appkit.client.models.request.SentRequestResult
 import com.reown.appkit.presets.AppKitChainsPresets
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     var isSessionAlive = false
     private val context = this
