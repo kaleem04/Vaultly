@@ -1,6 +1,7 @@
 package com.dapp.vaultly
 
 import android.util.Log
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -43,6 +44,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.dapp.vaultly.data.local.SessionStorage
 import com.dapp.vaultly.data.model.VaultlyRoutes
+import com.dapp.vaultly.ui.screens.AddPasswordBottomSheet
 import com.dapp.vaultly.ui.screens.DashboardScreen
 import com.dapp.vaultly.ui.screens.WelcomeScreen
 import com.dapp.vaultly.util.NavigationEvent
@@ -58,19 +60,21 @@ fun VaultlyApp(
     isSessionAlive: Boolean
 ) {
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
-    val modalSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val modalSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     var openNetworks by rememberSaveable { mutableStateOf(false) }
     val navController = rememberNavController()
     var onSearchClick by rememberSaveable { mutableStateOf(false) }
+    var showSheet by rememberSaveable { mutableStateOf(false) }
     Scaffold(
         topBar = {
             VaultlyTopAppBar(
                 onSearchClick = {
                     onSearchClick = !onSearchClick
                 },
-                onAddClick = {},
+                onAddClick = {
+                    showSheet = !showSheet
+                },
                 onSettingsClick = {},
                 isSearchActive = onSearchClick
 
@@ -86,60 +90,72 @@ fun VaultlyApp(
         }
     ) { paddingValues ->
         // Collect events from AppEventBus
-        LaunchedEffect(Unit) {
-            NavigationEvent.navigationEvents.collect { route ->
-                if (route == VaultlyRoutes.DASHBOARDSCREEN.name) {
-                    navController.navigate(VaultlyRoutes.DASHBOARDSCREEN.name)
+        Box() {
+            LaunchedEffect(Unit) {
+                NavigationEvent.navigationEvents.collect { route ->
+                    if (route == VaultlyRoutes.DASHBOARDSCREEN.name) {
+                        navController.navigate(VaultlyRoutes.DASHBOARDSCREEN.name)
+                    }
                 }
             }
-        }
-        LaunchedEffect(Unit) {
-            if (NavigationEvent.hasActiveSession()) {
-                NavigationEvent.setActiveSession(context, true)
-            } else {
-                SessionStorage.readSession(context).collect { persisted ->
-                    NavigationEvent.setActiveSession(context, persisted)
+            LaunchedEffect(Unit) {
+                if (NavigationEvent.hasActiveSession()) {
+                    NavigationEvent.setActiveSession(context, true)
+                } else {
+                    SessionStorage.readSession(context).collect { persisted ->
+                        NavigationEvent.setActiveSession(context, persisted)
+                    }
                 }
             }
-        }
-        NavHost(
-            navController = navController,
-            startDestination = VaultlyRoutes.WELCOMESCREEN.name
+            NavHost(
+                navController = navController,
+                startDestination = VaultlyRoutes.WELCOMESCREEN.name
 
-        ) {
-            composable(VaultlyRoutes.WELCOMESCREEN.name) {
-                WelcomeScreen {
-                    navController.navigate(VaultlyRoutes.VAULTLYBOTTOMSHEET.name)
+            ) {
+                composable(VaultlyRoutes.WELCOMESCREEN.name) {
+                    WelcomeScreen {
+                        navController.navigate(VaultlyRoutes.VAULTLYBOTTOMSHEET.name)
+                    }
                 }
-            }
-            composable(VaultlyRoutes.VAULTLYBOTTOMSHEET.name) {
-                VaultlyBottomSheet(
-                    onDismiss = {
-                        navController.popBackStack()
-                    },
+                composable(VaultlyRoutes.VAULTLYBOTTOMSHEET.name) {
+                    VaultlyBottomSheet(
+                        onDismiss = {
+                            navController.popBackStack()
+                        },
 
-                    )
-            }
-            composable(VaultlyRoutes.DASHBOARDSCREEN.name) {
-                DashboardScreen(
-                    onItemClick = {
-                        Log.d("@@", "Item clicked: $it")
-                    },
-                    onLogoutClick = {
-                        AppKit.disconnect(
-                            onSuccess = {
-                                navController.navigate(VaultlyRoutes.WELCOMESCREEN.name)
-                            }, onError = {
-
-                            }
                         )
-                    },
-                    search = onSearchClick,
-                    contentPaddingValues = paddingValues
-                )
+                }
+                composable(VaultlyRoutes.DASHBOARDSCREEN.name) {
+                    DashboardScreen(
+                        onItemClick = {
+                            Log.d("@@", "Item clicked: $it")
+                        },
+                        onLogoutClick = {
+                            AppKit.disconnect(
+                                onSuccess = {
+                                    navController.navigate(VaultlyRoutes.WELCOMESCREEN.name)
+                                }, onError = {
+
+                                }
+                            )
+                        },
+                        search = onSearchClick,
+                        contentPaddingValues = paddingValues
+                    )
+                }
             }
         }
 
+        if (showSheet) {
+            AddPasswordBottomSheet(
+                sheetState = modalSheetState,
+                onDismiss = { showSheet = false },
+                onSaveClick = { website, username, password ->
+                    // 🔒 Save password securely (to DB / storage)
+                    println("Saved: $website, $username, $password")
+                }
+            )
+        }
     }
 }
 
@@ -243,8 +259,10 @@ fun VaultlyTopAppBar(
         },
         actions = {
             IconButton(onClick = onSearchClick) {
-                Icon(if (!isSearchActive)Icons.Default.Search else Icons.Default.Close,
-                    contentDescription = "Search")
+                Icon(
+                    if (!isSearchActive) Icons.Default.Search else Icons.Default.Close,
+                    contentDescription = "Search"
+                )
             }
             IconButton(onClick = onAddClick) {
                 Icon(Icons.Default.Add, contentDescription = "Add Password")
