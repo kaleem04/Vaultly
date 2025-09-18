@@ -4,7 +4,10 @@ import android.content.Context
 import com.dapp.vaultly.data.local.SessionStorage
 import com.dapp.vaultly.data.model.VaultlyRoutes
 import com.reown.appkit.client.AppKit
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.launch
 
 object NavigationEvent {
     val navigationEvents = MutableSharedFlow<String>()
@@ -14,15 +17,16 @@ object NavigationEvent {
         navigationEvents.emit(route)
     }
 
-    suspend fun setActiveSession(context: Context, isActive: Boolean) {
-        sessionEvent.emit(isActive)
+    fun setActiveSession(context: Context, isActive: Boolean) {
+        CoroutineScope(Dispatchers.IO).launch {
+            sessionEvent.emit(isActive)
+            SessionStorage.saveSession(context, isActive)
 
-        SessionStorage.saveSession(context, isActive)
-
-        if (isActive) {
-            navigateTo(VaultlyRoutes.DASHBOARDSCREEN.name)
-        } else {
-            navigateTo(VaultlyRoutes.WELCOMESCREEN.name)
+            if (isActive) {
+                navigateTo(VaultlyRoutes.DASHBOARDSCREEN.name)
+            } else {
+                navigateTo(VaultlyRoutes.WELCOMESCREEN.name)
+            }
         }
     }
 

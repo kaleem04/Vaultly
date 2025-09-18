@@ -1,4 +1,4 @@
-package com.dapp.vaultly
+package com.dapp.vaultly.ui.viewmodels
 
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf

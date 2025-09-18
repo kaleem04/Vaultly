@@ -39,6 +39,7 @@ fun DashboardScreen(
     onItemClick: (VaultItem) -> Unit = {},
     onLogoutClick: () -> Unit = {},
     search: Boolean = false,
+    onRequestSignature : () -> Unit = {},
     contentPaddingValues: PaddingValues = PaddingValues(0.dp),
     modifier: Modifier = Modifier,
 ) {
@@ -76,6 +77,13 @@ fun DashboardScreen(
             item {
                 Button(
                     onClick = onLogoutClick
+                ) {
+                    Text(text = "Logout")
+                }
+            }
+            item {
+                Button(
+                    onClick = onRequestSignature
                 ) {
                     Text(text = "Logout")
                 }

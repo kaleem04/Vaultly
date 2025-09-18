@@ -38,9 +38,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.dapp.vaultly.data.local.SessionStorage
 import com.dapp.vaultly.data.model.VaultlyRoutes
@@ -48,6 +48,7 @@ import com.dapp.vaultly.ui.screens.AddPasswordBottomSheet
 import com.dapp.vaultly.ui.screens.DashboardScreen
 import com.dapp.vaultly.ui.screens.WelcomeScreen
 import com.dapp.vaultly.util.NavigationEvent
+import com.dapp.vaultly.util.VaultKeyManager
 import com.google.accompanist.navigation.material.ExperimentalMaterialNavigationApi
 import com.reown.appkit.client.AppKit
 import com.reown.appkit.ui.components.internal.AppKitComponent
@@ -62,35 +63,47 @@ fun VaultlyApp(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val modalSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
-    var openNetworks by rememberSaveable { mutableStateOf(false) }
     val navController = rememberNavController()
+    val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+
     var onSearchClick by rememberSaveable { mutableStateOf(false) }
     var showSheet by rememberSaveable { mutableStateOf(false) }
+    val noBottomNavRoutes = listOf(
+        VaultlyRoutes.WELCOMESCREEN.name,
+        VaultlyRoutes.VAULTLYBOTTOMSHEET.name
+    )
+    val shouldShowBars = noBottomNavRoutes.none { route ->
+        currentRoute?.startsWith(route) == true
+    }
     Scaffold(
         topBar = {
-            VaultlyTopAppBar(
-                onSearchClick = {
-                    onSearchClick = !onSearchClick
-                },
-                onAddClick = {
-                    showSheet = !showSheet
-                },
-                onSettingsClick = {},
-                isSearchActive = onSearchClick
+            if (shouldShowBars) {
+                VaultlyTopAppBar(
+                    onSearchClick = {
+                        onSearchClick = !onSearchClick
+                    },
+                    onAddClick = {
+                        showSheet = !showSheet
+                    },
+                    onSettingsClick = {},
+                    isSearchActive = onSearchClick
 
-            )
+                )
+            }
         },
         bottomBar = {
-            VaultlyBottomAppBar(
-                selectedItem = "home",
-                onItemSelected = {}
-            )
+            if (shouldShowBars) {
+                VaultlyBottomAppBar(
+                    selectedItem = "home",
+                    onItemSelected = {}
+                )
+            }
         },
         floatingActionButton = {
         }
     ) { paddingValues ->
         // Collect events from AppEventBus
-        Box() {
+        Box {
             LaunchedEffect(Unit) {
                 NavigationEvent.navigationEvents.collect { route ->
                     if (route == VaultlyRoutes.DASHBOARDSCREEN.name) {
@@ -101,6 +114,7 @@ fun VaultlyApp(
             LaunchedEffect(Unit) {
                 if (NavigationEvent.hasActiveSession()) {
                     NavigationEvent.setActiveSession(context, true)
+                    // navController.navigate(VaultlyRoutes.DASHBOARDSCREEN.name)
                 } else {
                     SessionStorage.readSession(context).collect { persisted ->
                         NavigationEvent.setActiveSession(context, persisted)
@@ -133,13 +147,18 @@ fun VaultlyApp(
                         onLogoutClick = {
                             AppKit.disconnect(
                                 onSuccess = {
-                                    navController.navigate(VaultlyRoutes.WELCOMESCREEN.name)
-                                }, onError = {
 
+                                }, onError = { error ->
+                                    Log.d("@@", "Logout error: $error")
                                 }
                             )
+                            navController.navigate(VaultlyRoutes.WELCOMESCREEN.name)
+                            NavigationEvent.setActiveSession(context, false)
                         },
                         search = onSearchClick,
+                        onRequestSignature = {
+                            VaultKeyManager.requestPersonalSign(AppKit.getAccount()?.address)
+                        },
                         contentPaddingValues = paddingValues
                     )
                 }

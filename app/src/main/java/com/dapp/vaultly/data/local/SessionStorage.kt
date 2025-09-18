@@ -12,7 +12,7 @@ val Context.dataStore by preferencesDataStore("user_preferences")
 object SessionStorage {
 
     private val IS_CONNECTED = booleanPreferencesKey("is_connected")
-    suspend fun saveSession(context: Context, connected: Boolean) {
+   suspend fun saveSession(context: Context, connected: Boolean) {
         context.dataStore.edit { pref ->
             pref[IS_CONNECTED] = connected
 

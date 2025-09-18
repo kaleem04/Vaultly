@@ -5,22 +5,26 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import com.dapp.vaultly.data.model.VaultlyRoutes
-import com.dapp.vaultly.ui.screens.DashboardScreen
 import com.dapp.vaultly.ui.theme.VaultlyTheme
+import com.dapp.vaultly.util.CryptoUtil
 import com.dapp.vaultly.util.NavigationEvent
+import com.dapp.vaultly.util.VaultKeyManager
 import com.reown.android.Core
 import com.reown.android.CoreClient
 import com.reown.android.relay.ConnectionType
 import com.reown.appkit.client.AppKit
 import com.reown.appkit.client.Modal
+import com.reown.appkit.client.models.request.Request
+import com.reown.appkit.client.models.request.SentRequestResult
 import com.reown.appkit.presets.AppKitChainsPresets
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.json.JSONArray
 
 class MainActivity : ComponentActivity() {
     var isSessionAlive = false
+    private val context = this
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val connectionType = ConnectionType.AUTOMATIC
@@ -61,7 +65,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             VaultlyTheme {
-           VaultlyApp(isSessionAlive)
+                VaultlyApp(isSessionAlive)
 
             }
         }
@@ -73,12 +77,16 @@ class MainActivity : ComponentActivity() {
         override fun onSessionApproved(approvedSession: Modal.Model.ApprovedSession) {
             // Triggered when receives the session approval from wallet
             CoroutineScope(Dispatchers.Default).launch {
-                NavigationEvent.navigationEvents.emit(VaultlyRoutes.DASHBOARDSCREEN.name)
+                NavigationEvent.setActiveSession(context, true)
             }
 
-            CoroutineScope(Dispatchers.Default).launch {
-                NavigationEvent.sessionEvent.emit(true)
-            }
+            val walletAddress = AppKit.getAccount()?.address;
+            val selectedSessionTopic =
+                (approvedSession as Modal.Model.ApprovedSession.WalletConnectSession).topic
+         //   VaultKeyManager.requestPersonalSign(walletAddress)
+
+            Log.d("@@", "onSessionApproved: $selectedSessionTopic");
+            Log.d("@@", "onSessionApproved: $walletAddress");
             Log.d("@@", "onSessionApproved: $approvedSession")
 
 
@@ -113,6 +121,23 @@ class MainActivity : ComponentActivity() {
         override fun onSessionRequestResponse(response: Modal.Model.SessionRequestResponse) {
             // Triggered when receives the session request response from wallet
             Log.d("@@", "onSessionRequestResponse: $response")
+
+            when (val result = response.result) {
+                is Modal.Model.JsonRpcResponse.JsonRpcResult -> {
+                    val signature = result.result ?: return
+                    Log.d("@@", "✅ Signature received: $signature")
+
+                    // 🔑 Derive AES key
+                    val aesKey = CryptoUtil.deriveAesKeyFromSignature(signature)
+                    VaultKeyManager.setKey(aesKey)
+
+                    Log.d("@@", "AES key derived & stored in memory")
+                }
+                is Modal.Model.JsonRpcResponse.JsonRpcError -> {
+                    Log.e("@@", "❌ Sign request failed: ${result.message}")
+                }
+            }
+            Log.d("@@", "onSessionRequestResponse: $response")
         }
 
         override fun onProposalExpired(proposal: Modal.Model.ExpiredProposal) {
@@ -136,4 +161,7 @@ class MainActivity : ComponentActivity() {
             Log.d("@@", "onSdkError: ${error.throwable.message}")
         }
     }
+
+
+
 }
