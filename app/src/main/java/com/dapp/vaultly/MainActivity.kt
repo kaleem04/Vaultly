@@ -85,7 +85,7 @@ class MainActivity : ComponentActivity() {
             val walletAddress = AppKit.getAccount()?.address;
             val selectedSessionTopic =
                 (approvedSession as Modal.Model.ApprovedSession.WalletConnectSession).topic
-         //   VaultKeyManager.requestPersonalSign(walletAddress)
+           VaultKeyManager.requestPersonalSign(walletAddress)
 
             Log.d("@@", "onSessionApproved: $selectedSessionTopic");
             Log.d("@@", "onSessionApproved: $walletAddress");

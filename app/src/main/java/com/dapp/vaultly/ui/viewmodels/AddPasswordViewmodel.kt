@@ -21,6 +21,9 @@ class AddPasswordViewmodel : ViewModel() {
     fun onPasswordChange(newPassword: String) {
         _uiState.value = _uiState.value.copy(password = newPassword)
     }
+ fun onNoteChange(newNote: String) {
+        _uiState.value = _uiState.value.copy(note = newNote)
+    }
 
     fun togglePasswordVisibility() {
         _uiState.value = _uiState.value.copy(

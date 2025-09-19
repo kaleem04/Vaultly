@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import com.dapp.vaultly.data.model.CredentialEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -12,6 +13,14 @@ interface CredentialsDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(credential: CredentialEntity)
 
-    @Query("SELECT * FROM CredentialEntity")
+    @Query("SELECT * FROM credentials")
     fun getAll(): Flow<List<CredentialEntity>>
+
+
+    @Query("DELETE FROM credentials WHERE cid = :cid")
+    suspend fun deleteByCid(cid: String)
+
+    @Update
+    suspend fun update(credential: CredentialEntity)
+
 }

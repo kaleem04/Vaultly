@@ -3,13 +3,19 @@ package com.dapp.vaultly.data.model
 import com.google.gson.annotations.SerializedName
 
 data class PinataRequest(
-    val pinataContent : PinataContent
+    val pinataContent : VaultlyContent,
 )
 
-data class PinataContent(
-    val content : String
-)
 
+data class VaultlyContent(
+    val iv: String,
+    val cipher: String
+)
+// What you fetch from IPFS
+data class PinataFetchResponse(
+    val iv: String,
+    val cipher: String
+)
 data class PinataResponse(
     @SerializedName("IpfsHash")
     val ipfsHash : String,

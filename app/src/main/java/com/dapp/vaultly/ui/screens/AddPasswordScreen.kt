@@ -23,17 +23,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.dapp.vaultly.data.model.Credential
 import com.dapp.vaultly.ui.viewmodels.AddPasswordViewmodel
+import com.dapp.vaultly.ui.viewmodels.CredentialViewmodel
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3Api::class)
 @Composable
 fun AddPasswordBottomSheet(
     sheetState: SheetState,
     onDismiss: () -> Unit,
-    viewModel: AddPasswordViewmodel = viewModel(),
+    viewModel: AddPasswordViewmodel = hiltViewModel(),
+    credentialViewmodel: CredentialViewmodel = hiltViewModel(),
     onSaveClick: (String, String, String) -> Unit
 ) {
     val uiState = viewModel.uiState.value
@@ -73,8 +76,8 @@ fun AddPasswordBottomSheet(
             Spacer(Modifier.height(12.dp))
 
             OutlinedTextField(
-                value = uiState.password,
-                onValueChange = viewModel::onPasswordChange,
+                value = uiState.note,
+                onValueChange = viewModel::onNoteChange,
                 label = { Text("Password") },
                 singleLine = true,
                 visualTransformation = if (uiState.showPassword) VisualTransformation.None else PasswordVisualTransformation(),
@@ -88,12 +91,24 @@ fun AddPasswordBottomSheet(
                 },
                 modifier = Modifier.fillMaxWidth()
             )
+            OutlinedTextField(
+                value = uiState.password,
+                onValueChange = viewModel::onPasswordChange,
+                label = { Text("Note") },
+                maxLines = 10,
+                modifier = Modifier.fillMaxWidth()
+            )
 
             Spacer(Modifier.height(20.dp))
-
+            val credential = Credential(
+                website = uiState.website,
+                username = uiState.username,
+                password = uiState.password,
+                note = uiState.note
+            )
             Button(
                 onClick = {
-                    onSaveClick(uiState.website, uiState.username, uiState.password)
+                    credentialViewmodel.addCredential(credential)
                     viewModel.clearFields()
                     onDismiss()
                 },

@@ -157,7 +157,7 @@ fun VaultlyApp(
                         },
                         search = onSearchClick,
                         onRequestSignature = {
-                            VaultKeyManager.requestPersonalSign(AppKit.getAccount()?.address)
+
                         },
                         contentPaddingValues = paddingValues
                     )
@@ -168,7 +168,14 @@ fun VaultlyApp(
         if (showSheet) {
             AddPasswordBottomSheet(
                 sheetState = modalSheetState,
-                onDismiss = { showSheet = false },
+                onDismiss = {
+                    showSheet = false
+                            navController.navigate(VaultlyRoutes.DASHBOARDSCREEN.name){
+                                popUpTo(VaultlyRoutes.DASHBOARDSCREEN.name){
+                                    inclusive = true
+                                }
+                            }
+                            },
                 onSaveClick = { website, username, password ->
                     // 🔒 Save password securely (to DB / storage)
                     println("Saved: $website, $username, $password")
