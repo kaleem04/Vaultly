@@ -5,52 +5,57 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dapp.vaultly.VaultDockedSearchBar
-import com.dapp.vaultly.data.model.CredentialEntity
+import com.dapp.vaultly.data.model.Credential
+import com.dapp.vaultly.data.model.UiState
 import com.dapp.vaultly.ui.viewmodels.DashboardViewmodel
-import java.util.Date
+import com.dapp.vaultly.util.Constants
+import com.reown.appkit.client.AppKit
 
 
 @Composable
 fun DashboardScreen(
-    dashboardViewmodel: DashboardViewmodel = hiltViewModel(),
+    dashboardViewmodel: DashboardViewmodel,
     onItemClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
     search: Boolean = false,
-    onRequestSignature: () -> Unit = {},
     contentPaddingValues: PaddingValues = PaddingValues(0.dp),
     modifier: Modifier = Modifier,
 ) {
     var query by remember { mutableStateOf("") }
-    val credentials by dashboardViewmodel.credentials.collectAsStateWithLifecycle()
-    val selected by dashboardViewmodel.selectedCredential.collectAsState()
+    val uiState by dashboardViewmodel.credentials.collectAsStateWithLifecycle()
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -72,25 +77,41 @@ fun DashboardScreen(
                 FilterChip(category, onClick = { /* filter */ })
             }
         }
-        // 🔹 Vault items (grid like LastPass)
-        LazyColumn(
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            items(credentials) { item ->
-                VaultCard(
-                    item,
-                    onClick = onItemClick,
-                    onDeleteClick = {}
-                )
+
+        when (uiState) {
+            is UiState.Idle -> {
+                EmptyVaultScreen()
             }
-//                    item {
-//                        Button(
-//                            onClick = onLogoutClick
-//                        ) {
-//                            Text(text = "Logout")
-//                        }
-//                    }
+
+            is UiState.Loading -> {
+                CircularProgressIndicator()
+            }
+
+            is UiState.Success -> {
+                val credentials = (uiState as UiState.Success<List<Credential>>).data
+                LazyColumn(
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    items(credentials) { item ->
+                        VaultCard(
+                            item,
+                            onClick = onItemClick,
+                            onDeleteClick = {
+                                dashboardViewmodel.deleteCredential(
+                                    AppKit.getAccount()?.address ?: "",
+                                    item.website
+                                )
+                            }
+                        )
+                    }
+                    item {
+                        Button(
+                            onClick = onLogoutClick
+                        ) {
+                            Text(text = "Logout")
+                        }
+                    }
 //                    item {
 //                        Button(
 //                            onClick = onRequestSignature
@@ -98,7 +119,15 @@ fun DashboardScreen(
 //                            Text(text = "Logout")
 //                        }
 //                    }
+                }
+
+            }
+
+            is UiState.Error -> {}
+
+
         }
+        // 🔹 Vault items (grid like LastPass)
     }
 }
 
@@ -122,7 +151,7 @@ fun FilterChip(label: String, onClick: () -> Unit) {
 
 @Composable
 fun VaultCard(
-    item: CredentialEntity,
+    credential: Credential,
     onClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
@@ -142,11 +171,14 @@ fun VaultCard(
                 verticalArrangement = Arrangement.spacedBy(5.dp),
                 modifier = Modifier.weight(0.8f)
             ) {
-                Text(item.website, style = MaterialTheme.typography.titleMedium)
+                Text(credential.website, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    Date(item.createdAt).toString(),
+                    text = credential.username,
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.Gray
+                )
+                Text(
+                    text = Constants.formatDate(credential.createdAt),
+                    style = MaterialTheme.typography.bodySmall,
                 )
 
             }
@@ -165,25 +197,42 @@ fun VaultCard(
     }
 }
 
+@Composable
+fun EmptyVaultScreen(
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = Icons.Filled.AddCircle, // Or Icons.Filled.Add if you prefer a simpler one
+            contentDescription = "Add new password", // For accessibility
+            modifier = Modifier.size(128.dp), // Make the icon large and inviting
+            tint = MaterialTheme.colorScheme.primary
+        )
 
-data class VaultItem(
-    val title: String,
-    val userName: String = "",
-    val password: String = "",
-    val note: String = "",
-    val createdAt: Long = System.currentTimeMillis()
-)
+        Spacer(modifier = Modifier.height(24.dp))
 
-val sampleVaultItems = listOf(
-    VaultItem("Gmail sgwrgergege", "user@gmail.comegrgegegegesgeg"),
-    VaultItem("Facebookgregeg", "user123"),
-    VaultItem("Bank", "****1234"),
-    VaultItem("Work Email", "work@company.com"),
-    VaultItem("Github", "devUser"),
-    VaultItem("Netflix", "user@mail.com"),
-    VaultItem("Bank", "****1234"),
-    VaultItem("Work Email", "work@company.com"),
-    VaultItem("Github", "devUser"),
-    VaultItem("Netflix", "user@mail.com"),
-)
+        Text(
+            text = "Your Vault is Empty",
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onSurface
+        )
 
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = "Tap the '+' button in The Top to add your first password and keep it secure.",
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 32.dp) // Give text some breathing room
+        )
+
+        Spacer(modifier = Modifier.height(32.dp)) // More space before
+    }
+}

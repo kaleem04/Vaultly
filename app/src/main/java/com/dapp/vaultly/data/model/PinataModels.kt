@@ -1,5 +1,6 @@
 package com.dapp.vaultly.data.model
 
+import android.R
 import com.google.gson.annotations.SerializedName
 
 data class PinataRequest(
@@ -8,8 +9,7 @@ data class PinataRequest(
 
 
 data class VaultlyContent(
-    val iv: String,
-    val cipher: String
+    val content : String
 )
 // What you fetch from IPFS
 data class PinataFetchResponse(

@@ -1,0 +1,18 @@
+package com.dapp.vaultly.data.local
+
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+
+@Dao
+interface UserVaultDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrUpdate(vault: UserVaultEntity)
+
+    @Query("SELECT * FROM user_vaults WHERE userId = :userId")
+    suspend fun getVault(userId: String): UserVaultEntity?
+
+    @Query("DELETE FROM user_vaults WHERE userId = :userId")
+    suspend fun deleteVault(userId: String)
+}

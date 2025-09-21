@@ -3,9 +3,11 @@ package com.dapp.vaultly.di
 import android.content.Context
 import androidx.room.Room
 import com.dapp.vaultly.data.local.CredentialsDao
+import com.dapp.vaultly.data.local.UserVaultDao
 import com.dapp.vaultly.data.local.VaultlyDatabase
 import com.dapp.vaultly.data.remote.PinataApi
 import com.dapp.vaultly.data.repository.CredentialRepository
+import com.dapp.vaultly.data.repository.UserVaultRepository
 import com.dapp.vaultly.util.Constants
 import com.dapp.vaultly.util.Constants.TEST_SIGNATURE
 import com.dapp.vaultly.util.CryptoUtil
@@ -43,19 +45,17 @@ object VaultlyModule {
     fun provideCredentialsDao(vaultlyDatabase: VaultlyDatabase): CredentialsDao {
         return vaultlyDatabase.credentialsDao()
     }
+
     @Singleton
     @Provides
     fun provideCredentialsRepository(
         credentialsDao: CredentialsDao,
-        pinataApi: PinataApi,
-        secretKey: SecretKey
     ): CredentialRepository {
         return CredentialRepository(
             dao = credentialsDao,
-            pinata = pinataApi,
-            secretKey = secretKey
         )
     }
+
     @Singleton
     @Provides
     fun provideRetrofit(client: OkHttpClient): Retrofit {
@@ -65,6 +65,7 @@ object VaultlyModule {
             .client(client)
             .build()
     }
+
     @Provides
     @Singleton
     fun provideOkHttpClient(): OkHttpClient {
@@ -84,6 +85,7 @@ object VaultlyModule {
             .addInterceptor(authInterceptor)
             .build()
     }
+
     @Provides
     @Singleton
     fun provideSecretKey(): SecretKey {
@@ -94,5 +96,25 @@ object VaultlyModule {
     @Singleton
     fun providePinataApi(retrofit: Retrofit): PinataApi {
         return retrofit.create(PinataApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideUserVaultDao(vaultlyDatabase: VaultlyDatabase): UserVaultDao {
+        return vaultlyDatabase.userVaultDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideUserVaultRepository(
+        userVaultDao: UserVaultDao,
+        pinataApi: PinataApi,
+        secretKey: SecretKey
+    ): UserVaultRepository {
+        return UserVaultRepository(
+            vaultDao = userVaultDao,
+            pinata = pinataApi,
+            secretKey = secretKey
+        )
     }
 }

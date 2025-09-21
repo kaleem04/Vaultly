@@ -5,5 +5,6 @@ data class Credential(
     val website: String,
     val username: String,
     val password: String,
-    val note: String
+    val note: String,
+    val createdAt : Long = System.currentTimeMillis()
 )

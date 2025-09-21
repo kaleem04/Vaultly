@@ -4,8 +4,14 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import com.dapp.vaultly.data.model.AddPasswordUiState
+import com.dapp.vaultly.data.repository.UserVaultRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 
-class AddPasswordViewmodel : ViewModel() {
+@HiltViewModel
+class AddPasswordViewmodel @Inject constructor(
+    private val vaultRepo: UserVaultRepository
+) : ViewModel() {
 
     private val _uiState = mutableStateOf(AddPasswordUiState())
     val uiState: State<AddPasswordUiState> = _uiState
@@ -21,7 +27,8 @@ class AddPasswordViewmodel : ViewModel() {
     fun onPasswordChange(newPassword: String) {
         _uiState.value = _uiState.value.copy(password = newPassword)
     }
- fun onNoteChange(newNote: String) {
+
+    fun onNoteChange(newNote: String) {
         _uiState.value = _uiState.value.copy(note = newNote)
     }
 
@@ -31,7 +38,17 @@ class AddPasswordViewmodel : ViewModel() {
         )
     }
 
+    fun credentialsValidation(): Boolean {
+        return uiState.value.username.isNotBlank() &&
+                uiState.value.website.isNotBlank() &&
+                uiState.value.password.isNotBlank()
+
+
+    }
+
     fun clearFields() {
         _uiState.value = AddPasswordUiState()
     }
+
+
 }

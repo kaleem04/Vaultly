@@ -1,46 +1,75 @@
 package com.dapp.vaultly.ui.viewmodels
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dapp.vaultly.data.model.Credential
-import com.dapp.vaultly.data.model.CredentialEntity
-import com.dapp.vaultly.data.repository.CredentialRepository
+import com.dapp.vaultly.data.model.UiState
+import com.dapp.vaultly.data.repository.UserVaultRepository
+import com.reown.appkit.client.AppKit
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class DashboardViewmodel @Inject constructor(
-    private val repo: CredentialRepository
+    private val vaultRepo: UserVaultRepository, // optional if needed
 ) : ViewModel() {
 
-    // List screen state: only website + id + cid (safe to show)
-    val credentials: StateFlow<List<CredentialEntity>> =
-        repo.getCredentials()
-            .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+    private val _credentials = MutableStateFlow<UiState<List<Credential>>>(UiState.Idle)
+    val credentials: StateFlow<UiState<List<Credential>>> = _credentials.asStateFlow()
 
-    // Detail/decrypted state
-    private val _selectedCredential = MutableStateFlow<Credential?>(null)
-    val selectedCredential: StateFlow<Credential?> = _selectedCredential
+    private val _addPasswordUiState = MutableStateFlow<UiState<Unit>>(UiState.Idle)
+    val addPasswordUiState: StateFlow<UiState<Unit>> = _addPasswordUiState.asStateFlow()
 
-    fun selectCredential(entity: CredentialEntity) {
+    init {
+        loadCredentials(AppKit.getAccount()?.address ?: "")
+    }
+
+    fun loadCredentials(userId: String) {
         viewModelScope.launch {
-            val decrypted = repo.fetchCredential(entity)
-            _selectedCredential.value = decrypted
+            _credentials.value = UiState.Loading
+            try {
+
+                val list = vaultRepo.getCredentials(userId)
+                _credentials.value = UiState.Success(list)
+            } catch (e: Exception) {
+                _credentials.value = UiState.Error(e.message ?: "Failed To Load Credentials")
+                Log.e("DashboardVM", "Error loading credentials", e)
+            }
         }
     }
 
-    fun clearSelection() {
-        _selectedCredential.value = null
+    fun addOrUpdateCredential(userId: String, credential: Credential) {
+        viewModelScope.launch {
+            _addPasswordUiState.value = UiState.Loading
+            try {
+
+                vaultRepo.addOrUpdateCredential(userId, credential)
+                loadCredentials(userId)
+                _addPasswordUiState.value = UiState.Success(Unit)
+            } catch (e: Exception) {
+                _addPasswordUiState.value = UiState.Error(e.message ?: "Failed To Add Credentials")
+                Log.e("AddPasswordVM", "Error adding/updating credential", e)
+
+            }
+        }
     }
 
-    fun deleteCredential(cid: String) {
+
+    fun deleteCredential(userId: String, website: String) {
         viewModelScope.launch {
-            repo.deleteCredential(cid)
+            _credentials.value = UiState.Loading
+            try {
+                vaultRepo.deleteCredential(userId, website)
+                loadCredentials(userId) // refresh list
+            } catch (e: Exception) {
+                _credentials.value = UiState.Error(e.message ?: "Failed To Delete Credential")
+                Log.e("DashboardVM", "Error deleting credential", e)
+            }
         }
     }
 }

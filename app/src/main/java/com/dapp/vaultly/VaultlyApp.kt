@@ -38,6 +38,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -47,8 +48,8 @@ import com.dapp.vaultly.data.model.VaultlyRoutes
 import com.dapp.vaultly.ui.screens.AddPasswordBottomSheet
 import com.dapp.vaultly.ui.screens.DashboardScreen
 import com.dapp.vaultly.ui.screens.WelcomeScreen
+import com.dapp.vaultly.ui.viewmodels.DashboardViewmodel
 import com.dapp.vaultly.util.NavigationEvent
-import com.dapp.vaultly.util.VaultKeyManager
 import com.google.accompanist.navigation.material.ExperimentalMaterialNavigationApi
 import com.reown.appkit.client.AppKit
 import com.reown.appkit.ui.components.internal.AppKitComponent
@@ -65,9 +66,10 @@ fun VaultlyApp(
     val modalSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val navController = rememberNavController()
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
-
+    val dashboardViewmodel: DashboardViewmodel = hiltViewModel()
     var onSearchClick by rememberSaveable { mutableStateOf(false) }
     var showSheet by rememberSaveable { mutableStateOf(false) }
+    var isLogoutSuccess by rememberSaveable { mutableStateOf(false) }
     val noBottomNavRoutes = listOf(
         VaultlyRoutes.WELCOMESCREEN.name,
         VaultlyRoutes.VAULTLYBOTTOMSHEET.name
@@ -75,6 +77,7 @@ fun VaultlyApp(
     val shouldShowBars = noBottomNavRoutes.none { route ->
         currentRoute?.startsWith(route) == true
     }
+
     Scaffold(
         topBar = {
             if (shouldShowBars) {
@@ -145,21 +148,25 @@ fun VaultlyApp(
                             Log.d("@@", "Item clicked: $it")
                         },
                         onLogoutClick = {
+
                             AppKit.disconnect(
                                 onSuccess = {
+                                    Log.d("@@", "Logout SuccessFull")
 
-                                }, onError = { error ->
-                                    Log.d("@@", "Logout error: $error")
+
+                                },
+                                onError = {
+                                    Log.d("@@", "Logout Failed")
                                 }
                             )
+
                             navController.navigate(VaultlyRoutes.WELCOMESCREEN.name)
                             NavigationEvent.setActiveSession(context, false)
-                        },
-                        search = onSearchClick,
-                        onRequestSignature = {
 
                         },
-                        contentPaddingValues = paddingValues
+                        search = onSearchClick,
+                        contentPaddingValues = paddingValues,
+                        dashboardViewmodel = dashboardViewmodel
                     )
                 }
             }
@@ -170,16 +177,13 @@ fun VaultlyApp(
                 sheetState = modalSheetState,
                 onDismiss = {
                     showSheet = false
-                            navController.navigate(VaultlyRoutes.DASHBOARDSCREEN.name){
-                                popUpTo(VaultlyRoutes.DASHBOARDSCREEN.name){
-                                    inclusive = true
-                                }
-                            }
-                            },
-                onSaveClick = { website, username, password ->
-                    // 🔒 Save password securely (to DB / storage)
-                    println("Saved: $website, $username, $password")
-                }
+                    navController.navigate(VaultlyRoutes.DASHBOARDSCREEN.name) {
+                        popUpTo(VaultlyRoutes.DASHBOARDSCREEN.name) {
+                            inclusive = true
+                        }
+                    }
+                },
+                dashboardViewmodel = dashboardViewmodel
             )
         }
     }
