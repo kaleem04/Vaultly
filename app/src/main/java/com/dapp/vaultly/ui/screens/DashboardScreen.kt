@@ -56,6 +56,7 @@ fun DashboardScreen(
 ) {
     var query by remember { mutableStateOf("") }
     val uiState by dashboardViewmodel.credentials.collectAsStateWithLifecycle()
+    val blockchainStatus by dashboardViewmodel.blockchain.collectAsStateWithLifecycle()
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -104,6 +105,24 @@ fun DashboardScreen(
                                 )
                             }
                         )
+                    }
+                    item {
+                        when(blockchainStatus){
+                            is UiState.Idle -> {}
+                            is UiState.Loading -> {
+                                CircularProgressIndicator()
+                            }
+                            is UiState.Success -> {
+                                val blockchainStatus = (blockchainStatus as UiState.Success<String>).data
+
+                                Text(text = blockchainStatus)
+                            }
+                            is UiState.Error -> {
+                                val error = (blockchainStatus as UiState.Error).message
+                                Text(text = error)
+                            }
+                        }
+
                     }
                     item {
                         Button(

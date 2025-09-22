@@ -200,7 +200,7 @@ fun VaultlyBottomSheet(
         modifier = modifier
     ) {
         AppKitComponent(
-            false,
+            true,
 
             ) {
             onDismiss()

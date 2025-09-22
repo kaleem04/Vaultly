@@ -74,7 +74,7 @@ class MainActivity : ComponentActivity() {
             token = Modal.Model.Token(
                 name = "Polygon",
                 symbol = "POL",                     // native token symbol
-                decimal = 18
+                decimal = 16
             ),
             rpcUrl = "https://rpc-amoy.polygon.technology",   // Amoy public RPC
             blockExplorerUrl = "https://www.oklink.com/amoy"  // Block explorer for Amoy
@@ -82,8 +82,7 @@ class MainActivity : ComponentActivity() {
         val chainList = listOf(
             amoyChain
         )
-        AppKit.
-        AppKit.setChains(AppKitChainsPresets.ethChains.values.toList()
+        AppKit.setChains(chainList
         )
         AppKit.setDelegate(appKitModalDelegate)
 
