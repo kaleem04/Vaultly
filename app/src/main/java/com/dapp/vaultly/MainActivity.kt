@@ -14,18 +14,15 @@ import com.reown.android.CoreClient
 import com.reown.android.relay.ConnectionType
 import com.reown.appkit.client.AppKit
 import com.reown.appkit.client.Modal
-import com.reown.appkit.client.models.request.Request
-import com.reown.appkit.client.models.request.SentRequestResult
 import com.reown.appkit.presets.AppKitChainsPresets
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import org.json.JSONArray
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    var isSessionAlive = false
+
     private val context = this
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -60,14 +57,41 @@ class MainActivity : ComponentActivity() {
                 Log.d("@@", "APPKIT INITIALIZED FAILED")
             }
         )
-        AppKit.setChains(AppKitChainsPresets.ethChains.values.toList())
+        val amoyChain = Modal.Model.Chain(
+            chainName = "Polygon Amoy",
+            chainNamespace = "eip155",             // always eip155 for EVM chains
+            chainReference = "80002",              // Amoy chain ID
+            requiredMethods = listOf(
+                "eth_sendTransaction",
+                "personal_sign",
+                "eth_signTypedData"
+            ),
+            optionalMethods = listOf(
+                "eth_call",
+                "eth_getBalance"
+            ),
+            events = listOf("chainChanged", "accountsChanged"),
+            token = Modal.Model.Token(
+                name = "Polygon",
+                symbol = "POL",                     // native token symbol
+                decimal = 18
+            ),
+            rpcUrl = "https://rpc-amoy.polygon.technology",   // Amoy public RPC
+            blockExplorerUrl = "https://www.oklink.com/amoy"  // Block explorer for Amoy
+        )
+        val chainList = listOf(
+            amoyChain
+        )
+        AppKit.
+        AppKit.setChains(AppKitChainsPresets.ethChains.values.toList()
+        )
         AppKit.setDelegate(appKitModalDelegate)
 
 
         enableEdgeToEdge()
         setContent {
             VaultlyTheme {
-                VaultlyApp(isSessionAlive)
+                VaultlyApp()
 
             }
         }
@@ -82,12 +106,13 @@ class MainActivity : ComponentActivity() {
                 NavigationEvent.setActiveSession(context, true)
             }
 
+            val selectedChain = AppKit.getSelectedChain()?.chainName
             val walletAddress = AppKit.getAccount()?.address;
             val selectedSessionTopic =
                 (approvedSession as Modal.Model.ApprovedSession.WalletConnectSession).topic
-          // VaultKeyManager.requestPersonalSign(walletAddress)
+            // VaultKeyManager.requestPersonalSign(walletAddress)
 
-            Log.d("@@", "onSessionApproved: $selectedSessionTopic");
+            Log.d("@@", "onSessionApproved: $selectedChain");
             Log.d("@@", "onSessionApproved: $walletAddress");
             Log.d("@@", "onSessionApproved: $approvedSession")
 
@@ -135,6 +160,7 @@ class MainActivity : ComponentActivity() {
 
                     Log.d("@@", "AES key derived & stored in memory")
                 }
+
                 is Modal.Model.JsonRpcResponse.JsonRpcError -> {
                     Log.e("@@", "❌ Sign request failed: ${result.message}")
                 }
@@ -154,7 +180,6 @@ class MainActivity : ComponentActivity() {
 
         override fun onConnectionStateChange(state: Modal.Model.ConnectionState) {
             //Triggered whenever the connection state is changed
-            isSessionAlive = state.isAvailable
             Log.d("@@", "Connection STATE CHANGED $state")
         }
 
@@ -163,7 +188,6 @@ class MainActivity : ComponentActivity() {
             Log.d("@@", "onSdkError: ${error.throwable.message}")
         }
     }
-
 
 
 }

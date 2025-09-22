@@ -53,6 +53,9 @@ android {
 dependencies {
     val boomVersion ="1.4.11"
     val roomVersion = "2.8.0"
+
+    //web3j
+    implementation("org.web3j:core:4.9.4")
     //retrofit
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     //gson converter

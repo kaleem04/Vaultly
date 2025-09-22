@@ -58,9 +58,7 @@ import com.reown.appkit.ui.components.internal.AppKitComponent
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialNavigationApi::class)
 
 @Composable
-fun VaultlyApp(
-    isSessionAlive: Boolean
-) {
+fun VaultlyApp() {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val modalSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
