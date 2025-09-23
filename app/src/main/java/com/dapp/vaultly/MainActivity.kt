@@ -77,7 +77,7 @@ class MainActivity : ComponentActivity() {
                 decimal = 16
             ),
             rpcUrl = "https://rpc-amoy.polygon.technology",   // Amoy public RPC
-            blockExplorerUrl = "https://www.oklink.com/amoy"  // Block explorer for Amoy
+            blockExplorerUrl = "https://www.oklink.com/amoy",  // Block explorer for Amoy
         )
         val chainList = listOf(
             amoyChain

@@ -18,6 +18,7 @@ import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.FunctionReturnDecoder
 import org.web3j.abi.TypeReference
 import org.web3j.abi.datatypes.Address
+import org.web3j.abi.datatypes.Function
 import org.web3j.abi.datatypes.Type
 import org.web3j.abi.datatypes.Utf8String
 import javax.crypto.SecretKey
@@ -124,30 +125,28 @@ class UserVaultRepository(
 
         pinata.unpin(vault.cid) // clean up old
     }
-
     suspend fun saveCid(account: String, contractAddress: String, cid: String): String =
         suspendCancellableCoroutine { cont ->
             try {
-                // Method ID for setCID(string) = keccak("setCID(string)").substring(0,8)
-                val functionSelector = getFunctionSelector("setCID(string)")
-
-                // Encode the string argument
-                val cidEncoded = FunctionEncoder.encodeConstructor(listOf(Utf8String(cid)))
-                    .removePrefix("0x")
-
-                val data = functionSelector + cidEncoded
+                val function = Function(
+                    "setCID",
+                    listOf(Utf8String(cid)),
+                    emptyList()
+                )
+                val data = FunctionEncoder.encode(function)
 
                 val txObject = mapOf(
                     "from" to account,
                     "to" to contractAddress,
-                    "data" to data
+                    "data" to data,
+                    "value" to "0x0"
                 )
 
-                val params = listOf(txObject)
+                val params = listOf(txObject).toString()
 
                 val request = Request(
                     method = "eth_sendTransaction",
-                    params = JSONArray(params).toString()
+                    params = params
                 )
 
                 AppKit.request(
