@@ -5,7 +5,9 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import com.dapp.vaultly.ui.theme.VaultlyTheme
+import com.dapp.vaultly.ui.viewmodels.AuthViewModel
 import com.dapp.vaultly.util.CryptoUtil
 import com.dapp.vaultly.util.NavigationEvent
 import com.dapp.vaultly.util.VaultKeyManager
@@ -14,7 +16,6 @@ import com.reown.android.CoreClient
 import com.reown.android.relay.ConnectionType
 import com.reown.appkit.client.AppKit
 import com.reown.appkit.client.Modal
-import com.reown.appkit.presets.AppKitChainsPresets
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -23,6 +24,7 @@ import kotlinx.coroutines.launch
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
+     val authViewmodel by viewModels<AuthViewModel>()
     private val context = this
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -82,110 +84,108 @@ class MainActivity : ComponentActivity() {
         val chainList = listOf(
             amoyChain
         )
-        AppKit.setChains(chainList
+        AppKit.setChains(
+            chainList
         )
-        AppKit.setDelegate(appKitModalDelegate)
+        AppKit.setDelegate(vaultlyDelegate(authViewmodel))
 
 
         enableEdgeToEdge()
         setContent {
             VaultlyTheme {
-                VaultlyApp()
+                VaultlyApp(authViewmodel)
 
             }
         }
 
 
     }
-
-    val appKitModalDelegate = object : AppKit.ModalDelegate {
-        override fun onSessionApproved(approvedSession: Modal.Model.ApprovedSession) {
-            // Triggered when receives the session approval from wallet
-            CoroutineScope(Dispatchers.Default).launch {
-                NavigationEvent.setActiveSession(context, true)
-            }
-
-            val selectedChain = AppKit.getSelectedChain()?.chainName
-            val walletAddress = AppKit.getAccount()?.address;
-            val selectedSessionTopic =
-                (approvedSession as Modal.Model.ApprovedSession.WalletConnectSession).topic
-            // VaultKeyManager.requestPersonalSign(walletAddress)
-
-            Log.d("@@", "onSessionApproved: $selectedChain");
-            Log.d("@@", "onSessionApproved: $walletAddress");
-            Log.d("@@", "onSessionApproved: $approvedSession")
-
-
-        }
-
-        override fun onSessionRejected(rejectedSession: Modal.Model.RejectedSession) {
-            // Triggered when receives the session rejection from wallet
-            Log.d("@@", "onSessionRejected: $rejectedSession")
-        }
-
-        override fun onSessionUpdate(updatedSession: Modal.Model.UpdatedSession) {
-            // Triggered when receives the session update from wallet
-            Log.d("@@", "onSessionUpdate: $updatedSession")
-        }
-
-        override fun onSessionExtend(session: Modal.Model.Session) {
-            // Triggered when receives the session extend from wallet
-            Log.d("@@", "onSessionExtend: $session")
-        }
-
-        @Deprecated("")
-        override fun onSessionEvent(sessionEvent: Modal.Model.SessionEvent) {
-            // Triggered when the peer emits events that match the list of events agreed upon session settlement
-            Log.d("@@", "onSessionEvent: $sessionEvent")
-        }
-
-        override fun onSessionDelete(deletedSession: Modal.Model.DeletedSession) {
-            // Triggered when receives the session delete from wallet
-            Log.d("@@", "onSessionDeleted: $deletedSession")
-        }
-
-        override fun onSessionRequestResponse(response: Modal.Model.SessionRequestResponse) {
-            // Triggered when receives the session request response from wallet
-            Log.d("@@", "onSessionRequestResponse: $response")
-
-            when (val result = response.result) {
-                is Modal.Model.JsonRpcResponse.JsonRpcResult -> {
-                    val signature = result.result ?: return
-                    Log.d("@@", "✅ Signature received: $signature")
-
-                    // 🔑 Derive AES key
-                    val aesKey = CryptoUtil.deriveAesKeyFromSignature(signature)
-                    VaultKeyManager.setKey(aesKey)
-
-                    Log.d("@@", "AES key derived & stored in memory")
+    fun vaultlyDelegate(authViewModel: AuthViewModel) : AppKit.ModalDelegate {
+        val appKitModalDelegate = object : AppKit.ModalDelegate {
+            override fun onSessionApproved(approvedSession: Modal.Model.ApprovedSession) {
+                // Triggered when receives the session approval from wallet
+                val walletAddress = AppKit.getAccount()?.address
+                if (walletAddress != null) {
+                    authViewModel.onWalletConnected(walletAddress)
                 }
 
-                is Modal.Model.JsonRpcResponse.JsonRpcError -> {
-                    Log.e("@@", "❌ Sign request failed: ${result.message}")
-                }
+              //  Log.d("@@", "onSessionApproved: $selectedChain");
+                Log.d("@@", "onSessionApproved: $walletAddress");
+                Log.d("@@", "onSessionApproved: $approvedSession")
+
+
             }
-            Log.d("@@", "onSessionRequestResponse: $response")
-        }
 
-        override fun onProposalExpired(proposal: Modal.Model.ExpiredProposal) {
-            // Triggered when a proposal becomes expired
-            Log.d("@@", "onProposalExpired: $proposal")
-        }
+            override fun onSessionRejected(rejectedSession: Modal.Model.RejectedSession) {
+                // Triggered when receives the session rejection from wallet
+                Log.d("@@", "onSessionRejected: $rejectedSession")
+            }
 
-        override fun onRequestExpired(request: Modal.Model.ExpiredRequest) {
-            // Triggered when a request becomes expired
-            Log.d("@@", "onRequestExtend: $request")
-        }
+            override fun onSessionUpdate(updatedSession: Modal.Model.UpdatedSession) {
+                // Triggered when receives the session update from wallet
+                Log.d("@@", "onSessionUpdate: $updatedSession")
+            }
 
-        override fun onConnectionStateChange(state: Modal.Model.ConnectionState) {
-            //Triggered whenever the connection state is changed
-            Log.d("@@", "Connection STATE CHANGED $state")
-        }
+            override fun onSessionExtend(session: Modal.Model.Session) {
+                // Triggered when receives the session extend from wallet
+                Log.d("@@", "onSessionExtend: $session")
+            }
 
-        override fun onError(error: Modal.Model.Error) {
-            // Triggered whenever there is an issue inside the SDK
-            Log.d("@@", "onSdkError: ${error.throwable.message}")
+            @Deprecated("")
+            override fun onSessionEvent(sessionEvent: Modal.Model.SessionEvent) {
+                // Triggered when the peer emits events that match the list of events agreed upon session settlement
+                Log.d("@@", "onSessionEvent: $sessionEvent")
+            }
+
+            override fun onSessionDelete(deletedSession: Modal.Model.DeletedSession) {
+                // Triggered when receives the session delete from wallet
+                Log.d("@@", "onSessionDeleted: $deletedSession")
+            }
+
+            override fun onSessionRequestResponse(response: Modal.Model.SessionRequestResponse) {
+                // Triggered when receives the session request response from wallet
+                Log.d("@@", "onSessionRequestResponse: $response")
+
+                when (val result = response.result) {
+                    is Modal.Model.JsonRpcResponse.JsonRpcResult -> {
+                        val signature = result.result ?: return
+                        Log.d("@@", "✅ Signature received: $signature")
+
+                        // 🔑 Derive AES key
+                       authViewmodel.onSignatureApproved(signature)
+
+                        Log.d("@@", "AES key derived & stored in memory")
+                    }
+
+                    is Modal.Model.JsonRpcResponse.JsonRpcError -> {
+                        Log.e("@@", "❌ Sign request failed: ${result.message}")
+                    }
+                }
+                Log.d("@@", "onSessionRequestResponse: $response")
+            }
+
+            override fun onProposalExpired(proposal: Modal.Model.ExpiredProposal) {
+                // Triggered when a proposal becomes expired
+                Log.d("@@", "onProposalExpired: $proposal")
+            }
+
+            override fun onRequestExpired(request: Modal.Model.ExpiredRequest) {
+                // Triggered when a request becomes expired
+                Log.d("@@", "onRequestExtend: $request")
+            }
+
+            override fun onConnectionStateChange(state: Modal.Model.ConnectionState) {
+                //Triggered whenever the connection state is changed
+                Log.d("@@", "Connection STATE CHANGED $state")
+            }
+
+            override fun onError(error: Modal.Model.Error) {
+                // Triggered whenever there is an issue inside the SDK
+                Log.d("@@", "onSdkError: ${error.throwable.message}")
+            }
+
         }
+        return appKitModalDelegate
     }
 
 

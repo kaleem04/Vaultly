@@ -189,24 +189,24 @@ class UserVaultRepository(
                     params = JSONArray(params).toString()
                 )
 
-                AppKit.request(
-                    request,
-                    onSuccess = { result ->
-                        try {
-                            val decoded = FunctionReturnDecoder.decode(
-                                result.toString(),
-                                listOf(TypeReference.create(Utf8String::class.java)) as List<TypeReference<Type<*>?>?>?
-                            )
-                            val cid = decoded.firstOrNull()?.value as? String ?: ""
-                            cont.resume(cid) {}
-                        } catch (e: Exception) {
-                            cont.resumeWithException(e)
-                        }
-                    },
-                    onError = { error ->
-                        cont.resumeWithException(Exception(error))
-                    }
-                )
+//                AppKit.request(
+//                    request,
+//                    onSuccess = { result ->
+//                        try {
+//                            val decoded = FunctionReturnDecoder.decode(
+//                                result.toString(),
+//                                listOf(TypeReference.create(Utf8String::class.java)) as List<TypeReference<Type<*>?>?>?
+//                            )
+//                            val cid = decoded.firstOrNull()?.value as? String ?: ""
+//                            cont.resume(cid) {}
+//                        } catch (e: Exception) {
+//                            cont.resumeWithException(e)
+//                        }
+//                    },
+//                    onError = { error ->
+//                        cont.resumeWithException(Exception(error))
+//                    }
+//                )
             } catch (e: Exception) {
                 cont.resumeWithException(e)
             }

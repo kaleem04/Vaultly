@@ -117,4 +117,10 @@ object VaultlyModule {
             secretKey = secretKey
         )
     }
+
+    @Provides
+    fun provideContext(@ApplicationContext context: Context): Context {
+        return context
+
+    }
 }
