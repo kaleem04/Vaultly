@@ -45,6 +45,13 @@ class AuthViewModel @Inject constructor(
             _uiState.value = WalletUiState.DashboardReady
         }
     }
+
+    fun onLogout(){
+        viewModelScope.launch {
+            AesKeyStorage.clearKey(context)
+            _uiState.value = WalletUiState.Welcome
+        }
+    }
 }
 
 

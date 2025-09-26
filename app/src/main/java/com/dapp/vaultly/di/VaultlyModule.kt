@@ -5,10 +5,12 @@ import androidx.room.Room
 import com.dapp.vaultly.data.local.CredentialsDao
 import com.dapp.vaultly.data.local.UserVaultDao
 import com.dapp.vaultly.data.local.VaultlyDatabase
-import com.dapp.vaultly.data.remote.PinataApi
+import com.dapp.vaultly.data.remote.VaultlyApi
 import com.dapp.vaultly.data.repository.CredentialRepository
+import com.dapp.vaultly.data.repository.PolygonRepository
 import com.dapp.vaultly.data.repository.UserVaultRepository
 import com.dapp.vaultly.util.Constants
+import com.dapp.vaultly.util.Constants.POLYGON_URL
 import com.dapp.vaultly.util.Constants.TEST_SIGNATURE
 import com.dapp.vaultly.util.CryptoUtil
 import dagger.Module
@@ -60,7 +62,7 @@ object VaultlyModule {
     @Provides
     fun provideRetrofit(client: OkHttpClient): Retrofit {
         return Retrofit.Builder()
-            .baseUrl(Constants.PINATA_URL)
+            .baseUrl(POLYGON_URL)
             .addConverterFactory(GsonConverterFactory.create())
             .client(client)
             .build()
@@ -94,8 +96,8 @@ object VaultlyModule {
 
     @Provides
     @Singleton
-    fun providePinataApi(retrofit: Retrofit): PinataApi {
-        return retrofit.create(PinataApi::class.java)
+    fun providePinataApi(retrofit: Retrofit): VaultlyApi {
+        return retrofit.create(VaultlyApi::class.java)
     }
 
     @Provides
@@ -108,12 +110,12 @@ object VaultlyModule {
     @Singleton
     fun provideUserVaultRepository(
         userVaultDao: UserVaultDao,
-        pinataApi: PinataApi,
+        vaultlyApi: VaultlyApi,
         secretKey: SecretKey
     ): UserVaultRepository {
         return UserVaultRepository(
             vaultDao = userVaultDao,
-            pinata = pinataApi,
+            pinata = vaultlyApi,
             secretKey = secretKey
         )
     }
@@ -122,5 +124,12 @@ object VaultlyModule {
     fun provideContext(@ApplicationContext context: Context): Context {
         return context
 
+    }
+
+    @Provides
+    fun providePolygonRepo(
+        vaultlyApi: VaultlyApi
+    ): PolygonRepository {
+        return PolygonRepository(vaultlyApi)
     }
 }

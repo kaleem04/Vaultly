@@ -6,7 +6,7 @@ import com.dapp.vaultly.data.local.UserVaultEntity
 import com.dapp.vaultly.data.model.Credential
 import com.dapp.vaultly.data.model.PinataRequest
 import com.dapp.vaultly.data.model.VaultlyContent
-import com.dapp.vaultly.data.remote.PinataApi
+import com.dapp.vaultly.data.remote.VaultlyApi
 import com.dapp.vaultly.util.Constants.getFunctionSelector
 import com.dapp.vaultly.util.CryptoUtil
 import com.reown.appkit.client.AppKit
@@ -15,18 +15,15 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import org.json.JSONArray
 import org.json.JSONObject
 import org.web3j.abi.FunctionEncoder
-import org.web3j.abi.FunctionReturnDecoder
-import org.web3j.abi.TypeReference
 import org.web3j.abi.datatypes.Address
 import org.web3j.abi.datatypes.Function
-import org.web3j.abi.datatypes.Type
 import org.web3j.abi.datatypes.Utf8String
 import javax.crypto.SecretKey
 import kotlin.coroutines.resumeWithException
 
 class UserVaultRepository(
     private val vaultDao: UserVaultDao,
-    private val pinata: PinataApi,
+    private val pinata: VaultlyApi,
     private val secretKey: SecretKey
 ) {
 

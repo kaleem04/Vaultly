@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dapp.vaultly.data.model.Credential
 import com.dapp.vaultly.data.model.UiState
+import com.dapp.vaultly.data.repository.PolygonRepository
 import com.dapp.vaultly.data.repository.UserVaultRepository
 import com.dapp.vaultly.util.Constants.CONTRACT_ADDRESS
 import com.reown.appkit.client.AppKit
@@ -18,6 +19,7 @@ import javax.inject.Inject
 @HiltViewModel
 class DashboardViewmodel @Inject constructor(
     private val vaultRepo: UserVaultRepository, // optional if needed
+    private val polygonRepository: PolygonRepository
 ) : ViewModel() {
 
     private val _credentials = MutableStateFlow<UiState<List<Credential>>>(UiState.Idle)
@@ -84,14 +86,14 @@ class DashboardViewmodel @Inject constructor(
 
     fun addCidToPolygon(userWalletAddress: String, cid: String) {
         viewModelScope.launch {
-            _blocchainState.value = UiState.Loading
+            //_blocchainState.value = UiState.Loading
             try {
                 vaultRepo.saveCid(account = userWalletAddress, CONTRACT_ADDRESS, cid)
                 val success = "Cid Added to Blockchain Successfully"
-                _blocchainState.value = UiState.Success(success)
+               // _blocchainState.value = UiState.Success(success)
             } catch (e: Exception) {
                 Log.d("@@", e.message ?: "Failed To Add Cid To Blockchain")
-                _blocchainState.value =
+//_blocchainState.value =
                     UiState.Error(e.message ?: "Failed To Add Cid To Blockchain")
             }
         }
@@ -101,9 +103,9 @@ class DashboardViewmodel @Inject constructor(
         viewModelScope.launch {
             _blocchainState.value = UiState.Loading
             try {
-                val data = vaultRepo.getCid(userWalletAddress, CONTRACT_ADDRESS)
+                val data = polygonRepository.getCid(userWalletAddress)
                 _blocchainState.value = UiState.Success(data)
-                Log.d("@@","onSUCCESS GETCID Failed To Get Cid From Blockchain")
+                Log.d("@@","CID Fetched Susscessfull")
             } catch (e: Exception) {
                 Log.d("@@", e.message ?: "Failed To Get Cid From Blockchain")
                 _blocchainState.value =

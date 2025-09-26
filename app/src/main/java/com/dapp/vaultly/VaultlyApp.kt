@@ -184,8 +184,8 @@ fun VaultlyApp(
                                     }
                                 )
 
-                                navController.navigate(VaultlyRoutes.WELCOMESCREEN.name)
-                                NavigationEvent.setActiveSession(context, false)
+                                //navController.navigate(VaultlyRoutes.WELCOMESCREEN.name)
+                                authViewmodel.onLogout()
 
                             },
                             search = onSearchClick,
