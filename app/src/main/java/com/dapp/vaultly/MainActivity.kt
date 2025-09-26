@@ -8,23 +8,17 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import com.dapp.vaultly.ui.theme.VaultlyTheme
 import com.dapp.vaultly.ui.viewmodels.AuthViewModel
-import com.dapp.vaultly.util.CryptoUtil
-import com.dapp.vaultly.util.NavigationEvent
-import com.dapp.vaultly.util.VaultKeyManager
 import com.reown.android.Core
 import com.reown.android.CoreClient
 import com.reown.android.relay.ConnectionType
 import com.reown.appkit.client.AppKit
 import com.reown.appkit.client.Modal
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
-     val authViewmodel by viewModels<AuthViewModel>()
+    val authViewmodel by viewModels<AuthViewModel>()
     private val context = this
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -100,7 +94,8 @@ class MainActivity : ComponentActivity() {
 
 
     }
-    fun vaultlyDelegate(authViewModel: AuthViewModel) : AppKit.ModalDelegate {
+
+    fun vaultlyDelegate(authViewModel: AuthViewModel): AppKit.ModalDelegate {
         val appKitModalDelegate = object : AppKit.ModalDelegate {
             override fun onSessionApproved(approvedSession: Modal.Model.ApprovedSession) {
                 // Triggered when receives the session approval from wallet
@@ -109,7 +104,7 @@ class MainActivity : ComponentActivity() {
                     authViewModel.onWalletConnected(walletAddress)
                 }
 
-              //  Log.d("@@", "onSessionApproved: $selectedChain");
+                //  Log.d("@@", "onSessionApproved: $selectedChain");
                 Log.d("@@", "onSessionApproved: $walletAddress");
                 Log.d("@@", "onSessionApproved: $approvedSession")
 
@@ -152,7 +147,7 @@ class MainActivity : ComponentActivity() {
                         Log.d("@@", "✅ Signature received: $signature")
 
                         // 🔑 Derive AES key
-                       authViewmodel.onSignatureApproved(signature)
+                        authViewmodel.onSignatureApproved(signature)
 
                         Log.d("@@", "AES key derived & stored in memory")
                     }

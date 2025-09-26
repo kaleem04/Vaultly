@@ -28,15 +28,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,7 +43,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.dapp.vaultly.data.local.SessionStorage
 import com.dapp.vaultly.data.model.VaultlyRoutes
 import com.dapp.vaultly.data.model.WalletUiState
 import com.dapp.vaultly.ui.screens.AddPasswordBottomSheet
@@ -54,7 +50,6 @@ import com.dapp.vaultly.ui.screens.DashboardScreen
 import com.dapp.vaultly.ui.screens.WelcomeScreen
 import com.dapp.vaultly.ui.viewmodels.AuthViewModel
 import com.dapp.vaultly.ui.viewmodels.DashboardViewmodel
-import com.dapp.vaultly.util.NavigationEvent
 import com.google.accompanist.navigation.material.ExperimentalMaterialNavigationApi
 import com.reown.appkit.client.AppKit
 import com.reown.appkit.client.models.request.Request
@@ -70,15 +65,12 @@ fun VaultlyApp(
     authViewmodel: AuthViewModel
 ) {
 
-    val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
     val modalSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val navController = rememberNavController()
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
     val dashboardViewmodel: DashboardViewmodel = hiltViewModel()
     var onSearchClick by rememberSaveable { mutableStateOf(false) }
     var showSheet by rememberSaveable { mutableStateOf(false) }
-    var isLogoutSuccess by rememberSaveable { mutableStateOf(false) }
     val authState by authViewmodel.uiState.collectAsStateWithLifecycle()
     val noBottomNavRoutes = listOf(
         VaultlyRoutes.WELCOMESCREEN.name,
@@ -96,7 +88,7 @@ fun VaultlyApp(
                         onSearchClick = !onSearchClick
                     },
                     onAddClick = {
-                        showSheet = !showSheet
+                        showSheet = true
                     },
                     onSettingsClick = {},
                     isSearchActive = onSearchClick
@@ -112,31 +104,13 @@ fun VaultlyApp(
                 )
             }
         },
-        floatingActionButton = {
-        }
     ) { paddingValues ->
         // Collect events from AppEventBus
         Box {
-//            LaunchedEffect(Unit) {
-//                NavigationEvent.navigationEvents.collect { route ->
-//                    if (route == VaultlyRoutes.DASHBOARDSCREEN.name) {
-//                        navController.navigate(VaultlyRoutes.DASHBOARDSCREEN.name)
-//                    }
-//                }
-//            }
-//            LaunchedEffect(Unit) {
-//                if (NavigationEvent.hasActiveSession()) {
-//                    NavigationEvent.setActiveSession(context, true)
-//                    // navController.navigate(VaultlyRoutes.DASHBOARDSCREEN.name)
-//                } else {
-//                    SessionStorage.readSession(context).collect { persisted ->
-//                        NavigationEvent.setActiveSession(context, persisted)
-//                    }
-//                }
-//            }
             NavHost(
                 navController = navController,
                 startDestination = when (authState) {
+                    WalletUiState.Idle -> VaultlyRoutes.WELCOMESCREEN.name
                     WalletUiState.Welcome -> VaultlyRoutes.WELCOMESCREEN.name
                     WalletUiState.DashboardReady -> VaultlyRoutes.DASHBOARDSCREEN.name
                     is WalletUiState.DashboardPendingSignature -> VaultlyRoutes.DASHBOARDSCREEN.name
@@ -166,7 +140,7 @@ fun VaultlyApp(
                                 requestPersonalSign(AppKit.getAccount()?.address)
                             }
                         )
-                    }else{
+                    } else {
                         DashboardScreen(
                             onItemClick = {
                                 Log.d("@@", "Item clicked: $it")
@@ -386,6 +360,7 @@ fun SignatureDialog(
         }
     )
 }
+
 fun requestPersonalSign(account: String?, message: String = "Vaultly unlock request") {
 
     val params = JSONArray()

@@ -6,7 +6,8 @@ import com.dapp.vaultly.data.local.UserVaultEntity
 import com.dapp.vaultly.data.model.Credential
 import com.dapp.vaultly.data.model.PinataRequest
 import com.dapp.vaultly.data.model.VaultlyContent
-import com.dapp.vaultly.data.remote.VaultlyApi
+import com.dapp.vaultly.data.remote.IpfsGatewayService
+import com.dapp.vaultly.data.remote.PinataApiService
 import com.dapp.vaultly.util.Constants.getFunctionSelector
 import com.dapp.vaultly.util.CryptoUtil
 import com.reown.appkit.client.AppKit
@@ -23,7 +24,8 @@ import kotlin.coroutines.resumeWithException
 
 class UserVaultRepository(
     private val vaultDao: UserVaultDao,
-    private val pinata: VaultlyApi,
+    private val pinata: PinataApiService,
+    private val ipfsGatewayService: IpfsGatewayService,
     private val secretKey: SecretKey
 ) {
 
@@ -44,6 +46,10 @@ class UserVaultRepository(
         }
     }
 
+    suspend fun getContentFromPinata(cid: String): String {
+        val response = ipfsGatewayService.getJsonFromIpfs(cid)
+        return response.content
+    }
     // Add or update a credential
     suspend fun addOrUpdateCredential(userId: String, credential: Credential) : String {
         val vault = vaultDao.getVault(userId)
@@ -95,6 +101,10 @@ class UserVaultRepository(
 
         return response.ipfsHash
     }
+
+//    suspend fun saveContentInDb(){
+//        vaultDao.insertOrUpdate()
+//    }
 
     // Delete a credential
     suspend fun deleteCredential(userId: String, website: String) {
@@ -160,52 +170,5 @@ class UserVaultRepository(
             }
         }
 
-
-    suspend fun getCid(account: String, contractAddress: String): String =
-        suspendCancellableCoroutine { cont ->
-            try {
-                // Method ID for getCID(address) = keccak("getCID(address)").substring(0,8)
-                val functionSelector = getFunctionSelector("getCID(address)")
-
-                val addressEncoded = FunctionEncoder.encodeConstructor(listOf(Address(account)))
-                    .removePrefix("0x")
-
-                val data = functionSelector + addressEncoded
-
-                val txObject = mapOf(
-                    "from" to account,
-                    "to" to contractAddress,
-                    "data" to data
-                )
-
-                val params = listOf(txObject, "latest")
-
-                val request = Request(
-                    method = "eth_call",
-                    params = JSONArray(params).toString()
-                )
-
-//                AppKit.request(
-//                    request,
-//                    onSuccess = { result ->
-//                        try {
-//                            val decoded = FunctionReturnDecoder.decode(
-//                                result.toString(),
-//                                listOf(TypeReference.create(Utf8String::class.java)) as List<TypeReference<Type<*>?>?>?
-//                            )
-//                            val cid = decoded.firstOrNull()?.value as? String ?: ""
-//                            cont.resume(cid) {}
-//                        } catch (e: Exception) {
-//                            cont.resumeWithException(e)
-//                        }
-//                    },
-//                    onError = { error ->
-//                        cont.resumeWithException(Exception(error))
-//                    }
-//                )
-            } catch (e: Exception) {
-                cont.resumeWithException(e)
-            }
-        }
 
 }

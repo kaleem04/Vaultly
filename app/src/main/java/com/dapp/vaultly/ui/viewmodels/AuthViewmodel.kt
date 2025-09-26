@@ -16,7 +16,7 @@ import javax.inject.Inject
 class AuthViewModel @Inject constructor(
     private val context: Application
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow<WalletUiState>(WalletUiState.DashboardReady)
+    private val _uiState = MutableStateFlow<WalletUiState>(WalletUiState.Idle)
     val uiState: StateFlow<WalletUiState> = _uiState
 
     init {
@@ -46,7 +46,7 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    fun onLogout(){
+    fun onLogout() {
         viewModelScope.launch {
             AesKeyStorage.clearKey(context)
             _uiState.value = WalletUiState.Welcome

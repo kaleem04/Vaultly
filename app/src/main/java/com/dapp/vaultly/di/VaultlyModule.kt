@@ -5,14 +5,21 @@ import androidx.room.Room
 import com.dapp.vaultly.data.local.CredentialsDao
 import com.dapp.vaultly.data.local.UserVaultDao
 import com.dapp.vaultly.data.local.VaultlyDatabase
-import com.dapp.vaultly.data.remote.VaultlyApi
+import com.dapp.vaultly.data.remote.IpfsGatewayService
+import com.dapp.vaultly.data.remote.PinataApiService
+import com.dapp.vaultly.data.remote.PolygonApiService
 import com.dapp.vaultly.data.repository.CredentialRepository
 import com.dapp.vaultly.data.repository.PolygonRepository
 import com.dapp.vaultly.data.repository.UserVaultRepository
 import com.dapp.vaultly.util.Constants
+import com.dapp.vaultly.util.Constants.IPFS_URL
+import com.dapp.vaultly.util.Constants.PINATA_URL
 import com.dapp.vaultly.util.Constants.POLYGON_URL
 import com.dapp.vaultly.util.Constants.TEST_SIGNATURE
 import com.dapp.vaultly.util.CryptoUtil
+import com.dapp.vaultly.util.IpfsGateway
+import com.dapp.vaultly.util.PinataApi
+import com.dapp.vaultly.util.PolygonApi
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -58,9 +65,21 @@ object VaultlyModule {
         )
     }
 
+    @PinataApi
     @Singleton
     @Provides
-    fun provideRetrofit(client: OkHttpClient): Retrofit {
+    fun provideRetrofitPinata(@PinataApi client: OkHttpClient): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl(PINATA_URL)
+            .addConverterFactory(GsonConverterFactory.create())
+            .client(client)
+            .build()
+    }
+
+    @PolygonApi
+    @Singleton
+    @Provides
+    fun provideRetrofitPolygon(@PolygonApi client: OkHttpClient): Retrofit {
         return Retrofit.Builder()
             .baseUrl(POLYGON_URL)
             .addConverterFactory(GsonConverterFactory.create())
@@ -68,9 +87,21 @@ object VaultlyModule {
             .build()
     }
 
+    @IpfsGateway
+    @Singleton
+    @Provides
+    fun provideRetrofitIpfs(@IpfsGateway client: OkHttpClient): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl(IPFS_URL)
+            .addConverterFactory(GsonConverterFactory.create())
+            .client(client)
+            .build()
+    }
+
+    @PinataApi
     @Provides
     @Singleton
-    fun provideOkHttpClient(): OkHttpClient {
+    fun providePinataOkHttpClient(): OkHttpClient {
         val logging = HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BODY
         }
@@ -88,16 +119,70 @@ object VaultlyModule {
             .build()
     }
 
+    @IpfsGateway
+    @Provides
+    @Singleton
+    fun provideIpfsOkHttpClient(): OkHttpClient {
+        val logging = HttpLoggingInterceptor().apply {
+            level = HttpLoggingInterceptor.Level.BODY
+        }
+
+        val authInterceptor = Interceptor { chain ->
+            val request = chain.request().newBuilder()
+                .addHeader("Authorization", "Bearer ${Constants.JWT_TOKEN}")
+                .build()
+            chain.proceed(request)
+        }
+
+        return OkHttpClient.Builder()
+            .addInterceptor(logging)
+            .addInterceptor(authInterceptor)
+            .build()
+    }
+
+    @PolygonApi
+    @Provides
+    @Singleton
+    fun providePolygonOkHttpClient(): OkHttpClient {
+        val logging = HttpLoggingInterceptor().apply {
+            level = HttpLoggingInterceptor.Level.BODY
+        }
+
+        val authInterceptor = Interceptor { chain ->
+            val request = chain.request().newBuilder()
+                .build()
+            chain.proceed(request)
+        }
+
+        return OkHttpClient.Builder()
+            .addInterceptor(logging)
+            .addInterceptor(authInterceptor)
+            .build()
+    }
+
     @Provides
     @Singleton
     fun provideSecretKey(): SecretKey {
         return CryptoUtil.deriveAesKeyFromSignature(TEST_SIGNATURE)
     }
 
+
     @Provides
     @Singleton
-    fun providePinataApi(retrofit: Retrofit): VaultlyApi {
-        return retrofit.create(VaultlyApi::class.java)
+    fun providePinataApi(@PinataApi retrofit: Retrofit): PinataApiService {
+        return retrofit.create(PinataApiService::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun providePolygonApi(@PolygonApi retrofit: Retrofit): PolygonApiService {
+        return retrofit.create(PolygonApiService::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideIpfsApi(@IpfsGateway retrofit: Retrofit): IpfsGatewayService {
+        return retrofit.create(IpfsGatewayService::class.java)
     }
 
     @Provides
@@ -110,12 +195,14 @@ object VaultlyModule {
     @Singleton
     fun provideUserVaultRepository(
         userVaultDao: UserVaultDao,
-        vaultlyApi: VaultlyApi,
+        pinataApiService: PinataApiService,
+        ipfsGatewayService: IpfsGatewayService,
         secretKey: SecretKey
     ): UserVaultRepository {
         return UserVaultRepository(
             vaultDao = userVaultDao,
-            pinata = vaultlyApi,
+            pinata = pinataApiService,
+            ipfsGatewayService = ipfsGatewayService,
             secretKey = secretKey
         )
     }
@@ -128,8 +215,8 @@ object VaultlyModule {
 
     @Provides
     fun providePolygonRepo(
-        vaultlyApi: VaultlyApi
+        polygonApiService: PolygonApiService
     ): PolygonRepository {
-        return PolygonRepository(vaultlyApi)
+        return PolygonRepository(polygonApiService)
     }
 }

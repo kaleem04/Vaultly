@@ -2,7 +2,8 @@ package com.dapp.vaultly.data.repository
 
 import android.util.Log
 import com.dapp.vaultly.data.model.PolygonResponse
-import com.dapp.vaultly.data.remote.VaultlyApi
+import com.dapp.vaultly.data.remote.PinataApiService
+import com.dapp.vaultly.data.remote.PolygonApiService
 import com.dapp.vaultly.util.Constants.API_KEY
 import com.dapp.vaultly.util.Constants.CONTRACT_ADDRESS
 import org.web3j.abi.FunctionEncoder
@@ -14,7 +15,7 @@ import org.web3j.abi.datatypes.Type
 import org.web3j.abi.datatypes.Utf8String
 
 class PolygonRepository(
-    private val vaultlyApi: VaultlyApi
+    private val polygonApiService: PolygonApiService
 ) {
     companion object {
         private const val TAG = "PolygonRepository"
@@ -41,7 +42,7 @@ class PolygonRepository(
             val data = encodeGetCid(userWalletAddress)
 
             // Call polygonscan (eth_call)
-            val response: PolygonResponse = vaultlyApi.getCidFromPolygon(
+            val response: PolygonResponse = polygonApiService.getCidFromPolygon(
                 to = CONTRACT_ADDRESS,
                 data = data,
                 apiKey = API_KEY

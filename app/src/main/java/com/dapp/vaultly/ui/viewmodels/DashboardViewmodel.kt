@@ -18,7 +18,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class DashboardViewmodel @Inject constructor(
-    private val vaultRepo: UserVaultRepository, // optional if needed
+    private val vaultRepo: UserVaultRepository,
     private val polygonRepository: PolygonRepository
 ) : ViewModel() {
 
@@ -28,24 +28,54 @@ class DashboardViewmodel @Inject constructor(
     private val _addPasswordUiState = MutableStateFlow<UiState<Unit>>(UiState.Idle)
     val addPasswordUiState: StateFlow<UiState<Unit>> = _addPasswordUiState.asStateFlow()
 
-    private val _blocchainState = MutableStateFlow<UiState<String>>(UiState.Idle)
-    val blockchain: StateFlow<UiState<String>> = _blocchainState.asStateFlow()
+    private val _blockchainState = MutableStateFlow<UiState<String>>(UiState.Idle)
+    val blockchain: StateFlow<UiState<String>> = _blockchainState.asStateFlow()
 
     init {
-        loadCredentials(AppKit.getAccount()?.address ?: "")
+        val userId = AppKit.getAccount()?.address ?: ""
+        // 1. Load from Room (offline-first)
+        loadCredentials(userId)
+        // 2. Refresh from Polygon + Pinata (network sync)
+        refreshFromBlockchain(userId)
     }
 
-    fun loadCredentials(userId: String) {
+    /** Load from Room only */
+    private fun loadCredentials(userId: String) {
         viewModelScope.launch {
             _credentials.value = UiState.Loading
             try {
-
                 val list = vaultRepo.getCredentials(userId)
                 _credentials.value = UiState.Success(list)
-                getCidFromPolygon(userWalletAddress = userId)
             } catch (e: Exception) {
                 _credentials.value = UiState.Error(e.message ?: "Failed To Load Credentials")
                 Log.e("DashboardVM", "Error loading credentials", e)
+            }
+        }
+    }
+
+    /** Force sync: Polygon → Pinata → DB */
+    private fun refreshFromBlockchain(userId: String) {
+        viewModelScope.launch {
+            _blockchainState.value = UiState.Loading
+            try {
+                // 1. Get CID from Polygon
+                val cid = polygonRepository.getCid(userId)
+                _blockchainState.value = UiState.Success(cid)
+                Log.d("DashboardVM", "CID fetched: $cid")
+
+                if (cid.isNotEmpty()) {
+                    // 2. Fetch content from Pinata
+                    val content = vaultRepo.getContentFromPinata(cid)
+                    Log.d("@@",content.toString())
+                    // 3. Store into Room (UI updates automatically from DB observer)
+                  //  vaultRepo.saveContent(userId, content)
+
+                    Log.d("DashboardVM", "Content saved in DB successfully")
+                }
+            } catch (e: Exception) {
+                Log.e("DashboardVM", "Error syncing from blockchain", e)
+                _blockchainState.value =
+                    UiState.Error(e.message ?: "Failed To Sync From Blockchain")
             }
         }
     }
@@ -54,21 +84,21 @@ class DashboardViewmodel @Inject constructor(
         viewModelScope.launch {
             _addPasswordUiState.value = UiState.Loading
             try {
-
                 val cid = vaultRepo.addOrUpdateCredential(userId, credential)
-                loadCredentials(userId)
                 _addPasswordUiState.value = UiState.Success(Unit)
+
                 if (cid.isNotEmpty()) {
+                    // push new CID to Polygon
                     addCidToPolygon(userWalletAddress = userId, cid = cid)
                 }
+                // reload DB view
+                loadCredentials(userId)
             } catch (e: Exception) {
                 _addPasswordUiState.value = UiState.Error(e.message ?: "Failed To Add Credentials")
-                Log.e("AddPasswordVM", "Error adding/updating credential", e)
-
+                Log.e("DashboardVM", "Error adding/updating credential", e)
             }
         }
     }
-
 
     fun deleteCredential(userId: String, website: String) {
         viewModelScope.launch {
@@ -83,33 +113,13 @@ class DashboardViewmodel @Inject constructor(
         }
     }
 
-
-    fun addCidToPolygon(userWalletAddress: String, cid: String) {
+    private fun addCidToPolygon(userWalletAddress: String, cid: String) {
         viewModelScope.launch {
-            //_blocchainState.value = UiState.Loading
             try {
                 vaultRepo.saveCid(account = userWalletAddress, CONTRACT_ADDRESS, cid)
-                val success = "Cid Added to Blockchain Successfully"
-               // _blocchainState.value = UiState.Success(success)
+                Log.d("DashboardVM", "Cid Added to Blockchain Successfully")
             } catch (e: Exception) {
-                Log.d("@@", e.message ?: "Failed To Add Cid To Blockchain")
-//_blocchainState.value =
-                    UiState.Error(e.message ?: "Failed To Add Cid To Blockchain")
-            }
-        }
-    }
-
-    fun getCidFromPolygon(userWalletAddress: String) {
-        viewModelScope.launch {
-            _blocchainState.value = UiState.Loading
-            try {
-                val data = polygonRepository.getCid(userWalletAddress)
-                _blocchainState.value = UiState.Success(data)
-                Log.d("@@","CID Fetched Susscessfull")
-            } catch (e: Exception) {
-                Log.d("@@", e.message ?: "Failed To Get Cid From Blockchain")
-                _blocchainState.value =
-                    UiState.Error(e.message ?: "Failed To Get Cid From Blockchain")
+                Log.e("DashboardVM", "Failed To Add Cid To Blockchain", e)
             }
         }
     }
