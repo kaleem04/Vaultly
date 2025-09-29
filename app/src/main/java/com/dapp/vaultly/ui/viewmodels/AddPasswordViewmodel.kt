@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import com.dapp.vaultly.data.model.AddPasswordUiState
 import com.dapp.vaultly.data.repository.UserVaultRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
 
 @HiltViewModel
@@ -15,6 +17,13 @@ class AddPasswordViewmodel @Inject constructor(
 
     private val _uiState = mutableStateOf(AddPasswordUiState())
     val uiState: State<AddPasswordUiState> = _uiState
+
+    private val _selectedCredentialId = MutableStateFlow<String?>(null)
+    val selectedCredentialId: StateFlow<String?> = _selectedCredentialId
+
+    fun selectCredential(id: String) {
+        _selectedCredentialId.value = id
+    }
 
     fun onWebsiteChange(newWebsite: String) {
         _uiState.value = _uiState.value.copy(website = newWebsite)

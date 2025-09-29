@@ -1,5 +1,6 @@
 package com.dapp.vaultly.util
 
+import com.reown.appkit.client.AppKit
 import org.web3j.crypto.Hash
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -16,6 +17,8 @@ object Constants {
     const val JWT_TOKEN =
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySW5mb3JtYXRpb24iOnsiaWQiOiI0ZjM2ODQyYS1iY2I1LTQ0ZGQtYjE4My1lZWIyZDNhMzA1MjAiLCJlbWFpbCI6InliYWRzaGFoZ2FtaW5nQGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJwaW5fcG9saWN5Ijp7InJlZ2lvbnMiOlt7ImRlc2lyZWRSZXBsaWNhdGlvbkNvdW50IjoxLCJpZCI6IkZSQTEifSx7ImRlc2lyZWRSZXBsaWNhdGlvbkNvdW50IjoxLCJpZCI6Ik5ZQzEifV0sInZlcnNpb24iOjF9LCJtZmFfZW5hYmxlZCI6ZmFsc2UsInN0YXR1cyI6IkFDVElWRSJ9LCJhdXRoZW50aWNhdGlvblR5cGUiOiJzY29wZWRLZXkiLCJzY29wZWRLZXlLZXkiOiIxYTlkYzc1YjE0MTNhMzBlY2E2YiIsInNjb3BlZEtleVNlY3JldCI6IjQ1MjhmMTZlZmY1OWUwZjRkZjYzMGQxMzY4OWY1NTFlOWJmZTgwZjJmYzlhNzFkOGUwYTIyODUzMDFmZWRkZTMiLCJleHAiOjE3ODg4NzAyODh9.-HMMgGTQcO126PPboVrq7P0h0upZR0MHpyPvJ0hXTE8"
     const val API_KEY = "U67KSQT7TU38T83K4ENRUVZ8315IF7MGXJ"
+
+    val WALLET_ADDRESS = AppKit.getAccount()?.address ?: ""
     fun formatDate(createdAt: Long): String {
         val instant = Date(createdAt).toInstant()
         val formatter = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT)

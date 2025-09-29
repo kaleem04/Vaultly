@@ -3,6 +3,7 @@ package com.dapp.vaultly.ui.viewmodels
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.dapp.vaultly.data.local.UserVaultEntity
 import com.dapp.vaultly.data.model.Credential
 import com.dapp.vaultly.data.model.UiState
 import com.dapp.vaultly.data.repository.PolygonRepository
@@ -52,26 +53,30 @@ class DashboardViewmodel @Inject constructor(
             }
         }
     }
+    fun getCredentialById(id: String): Credential? {
+        return _credentials.value.find { it.id == id }
+    }
 
     /** Force sync: Polygon → Pinata → DB */
-    private fun refreshFromBlockchain(userId: String) {
+     fun refreshFromBlockchain(userId: String) {
         viewModelScope.launch {
             _blockchainState.value = UiState.Loading
             try {
                 // 1. Get CID from Polygon
-                val cid = polygonRepository.getCid(userId)
-                _blockchainState.value = UiState.Success(cid)
-                Log.d("DashboardVM", "CID fetched: $cid")
-
-                if (cid.isNotEmpty()) {
-                    // 2. Fetch content from Pinata
-                    val content = vaultRepo.getContentFromPinata(cid)
-                    Log.d("@@",content.toString())
-                    // 3. Store into Room (UI updates automatically from DB observer)
-                  //  vaultRepo.saveContent(userId, content)
-
-                    Log.d("DashboardVM", "Content saved in DB successfully")
-                }
+               // val cid = polygonRepository.getCid(userId)
+//                _blockchainState.value = UiState.Success(cid)
+//                Log.d("DashboardVM", "CID fetched: $cid")
+//
+//                if (cid.isNotEmpty()) {
+//                    // 2. Fetch content from Pinata
+//                    val content = vaultRepo.getContentFromPinata(cid)
+//                    Log.d("@@",content.toString())
+//                    // 3. Store into Room (UI updates automatically from DB observer)
+//
+//                    vaultRepo.saveContentInDb(userId,cid,content)
+//                    Log.d("DashboardVM", "Content saved in DB successfully")
+//                    loadCredentials(userId)
+//                }
             } catch (e: Exception) {
                 Log.e("DashboardVM", "Error syncing from blockchain", e)
                 _blockchainState.value =
@@ -88,11 +93,17 @@ class DashboardViewmodel @Inject constructor(
                 _addPasswordUiState.value = UiState.Success(Unit)
 
                 if (cid.isNotEmpty()) {
-                    // push new CID to Polygon
-                    addCidToPolygon(userWalletAddress = userId, cid = cid)
+                    // 2. Fetch content from Pinata
+                    val content = vaultRepo.getContentFromPinata(cid)
+                    Log.d("@@","$content")
+                    // 3. Store into Room (UI updates automatically from DB observer)
+                    if(content.isNotEmpty()) {
+                        vaultRepo.saveContentInDb(userId, cid, content)
+                        Log.d("DashboardVM", "Content saved in DB successfully")
+                    }
                 }
-                // reload DB view
                 loadCredentials(userId)
+                _addPasswordUiState.value = UiState.Idle
             } catch (e: Exception) {
                 _addPasswordUiState.value = UiState.Error(e.message ?: "Failed To Add Credentials")
                 Log.e("DashboardVM", "Error adding/updating credential", e)

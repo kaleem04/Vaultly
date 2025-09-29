@@ -4,11 +4,12 @@ import android.util.Log
 import com.dapp.vaultly.data.local.UserVaultDao
 import com.dapp.vaultly.data.local.UserVaultEntity
 import com.dapp.vaultly.data.model.Credential
+import com.dapp.vaultly.data.model.PinataMetadata
 import com.dapp.vaultly.data.model.PinataRequest
 import com.dapp.vaultly.data.model.VaultlyContent
 import com.dapp.vaultly.data.remote.IpfsGatewayService
 import com.dapp.vaultly.data.remote.PinataApiService
-import com.dapp.vaultly.util.Constants.getFunctionSelector
+import com.dapp.vaultly.util.Constants.WALLET_ADDRESS
 import com.dapp.vaultly.util.CryptoUtil
 import com.reown.appkit.client.AppKit
 import com.reown.appkit.client.models.request.Request
@@ -16,7 +17,6 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import org.json.JSONArray
 import org.json.JSONObject
 import org.web3j.abi.FunctionEncoder
-import org.web3j.abi.datatypes.Address
 import org.web3j.abi.datatypes.Function
 import org.web3j.abi.datatypes.Utf8String
 import javax.crypto.SecretKey
@@ -34,7 +34,7 @@ class UserVaultRepository(
         val vault = vaultDao.getVault(userId) ?: return emptyList()
         val decryptedJson = CryptoUtil.decryptBlob(vault.encryptedBlob, secretKey)
         val jsonArray = JSONArray(decryptedJson)
-        Log.d("@@",jsonArray.toString())
+        Log.d("@@", jsonArray.toString())
         return List(jsonArray.length()) { i ->
             val obj = jsonArray.getJSONObject(i)
             Credential(
@@ -48,10 +48,11 @@ class UserVaultRepository(
 
     suspend fun getContentFromPinata(cid: String): String {
         val response = ipfsGatewayService.getJsonFromIpfs(cid)
-        return response.content
+        return response.vault.content
     }
+
     // Add or update a credential
-    suspend fun addOrUpdateCredential(userId: String, credential: Credential) : String {
+    suspend fun addOrUpdateCredential(userId: String, credential: Credential): String {
         val vault = vaultDao.getVault(userId)
         val currentList = vault?.let {
             val decryptedJson = CryptoUtil.decryptBlob(it.encryptedBlob, secretKey)
@@ -86,7 +87,18 @@ class UserVaultRepository(
 
         val encryptedBlob = CryptoUtil.encryptBlob(jsonArray.toString(), secretKey)
         val vaultlycontent = VaultlyContent(encryptedBlob)
-        val response = pinata.pinJsonToIpfs(PinataRequest(vaultlycontent))
+        val content = mapOf(
+            "wallet" to WALLET_ADDRESS,
+            "vault" to vaultlycontent
+        )
+       val  pinataMetadata = PinataMetadata(
+           name = "vault_${WALLET_ADDRESS}.json",
+           keyValues = mapOf(
+               "wallet" to WALLET_ADDRESS,
+               "type" to "vault"
+           )
+       )
+           val response = pinata.pinJsonToIpfs(PinataRequest(content,pinataMetadata))
 
         vaultDao.insertOrUpdate(
             UserVaultEntity(
@@ -102,9 +114,14 @@ class UserVaultRepository(
         return response.ipfsHash
     }
 
-//    suspend fun saveContentInDb(){
-//        vaultDao.insertOrUpdate()
-//    }
+    suspend fun saveContentInDb(userId: String, cid: String, content: String) {
+        val userVaultEntity = UserVaultEntity(
+            userId = userId,
+            cid = cid,
+            encryptedBlob = content
+        )
+        vaultDao.insertOrUpdate(userVaultEntity)
+    }
 
     // Delete a credential
     suspend fun deleteCredential(userId: String, website: String) {
@@ -132,6 +149,7 @@ class UserVaultRepository(
 
         pinata.unpin(vault.cid) // clean up old
     }
+
     suspend fun saveCid(account: String, contractAddress: String, cid: String): String =
         suspendCancellableCoroutine { cont ->
             try {

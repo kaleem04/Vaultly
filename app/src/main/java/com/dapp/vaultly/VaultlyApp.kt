@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
@@ -31,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -39,22 +39,26 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.dapp.vaultly.data.model.Credential
 import com.dapp.vaultly.data.model.VaultlyRoutes
 import com.dapp.vaultly.data.model.WalletUiState
-import com.dapp.vaultly.ui.screens.AddPasswordBottomSheet
+import com.dapp.vaultly.ui.screens.AddPasswordBottomSheetContent
 import com.dapp.vaultly.ui.screens.DashboardScreen
 import com.dapp.vaultly.ui.screens.WelcomeScreen
-import com.dapp.vaultly.ui.viewmodels.AuthViewModel
+import com.dapp.vaultly.ui.viewmodels.AuthViewmodel
 import com.dapp.vaultly.ui.viewmodels.DashboardViewmodel
 import com.google.accompanist.navigation.material.ExperimentalMaterialNavigationApi
 import com.reown.appkit.client.AppKit
 import com.reown.appkit.client.models.request.Request
 import com.reown.appkit.client.models.request.SentRequestResult
 import com.reown.appkit.ui.components.internal.AppKitComponent
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 
 
@@ -62,9 +66,11 @@ import org.json.JSONArray
 
 @Composable
 fun VaultlyApp(
-    authViewmodel: AuthViewModel
+    authViewmodel: AuthViewmodel
 ) {
+    var editingCredential by remember { mutableStateOf<Credential?>(null) }
 
+    val coroutineScope = rememberCoroutineScope()
     val modalSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val navController = rememberNavController()
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
@@ -140,6 +146,9 @@ fun VaultlyApp(
                                 requestPersonalSign(AppKit.getAccount()?.address)
                             }
                         )
+                        dashboardViewmodel.refreshFromBlockchain(
+                            userId = AppKit.getAccount()?.address ?: ""
+                        )
                     } else {
                         DashboardScreen(
                             onItemClick = {
@@ -170,20 +179,31 @@ fun VaultlyApp(
                 }
             }
         }
-
         if (showSheet) {
-            AddPasswordBottomSheet(
+            ModalBottomSheet(
                 sheetState = modalSheetState,
-                onDismiss = {
-                    showSheet = false
-                    navController.navigate(VaultlyRoutes.DASHBOARDSCREEN.name) {
-                        popUpTo(VaultlyRoutes.DASHBOARDSCREEN.name) {
-                            inclusive = true
-                        }
+                onDismissRequest = {
+                    coroutineScope.launch {
+                        modalSheetState.hide()
+                    }.invokeOnCompletion {
+                        showSheet = false
                     }
                 },
-                dashboardViewmodel = dashboardViewmodel
-            )
+            ) {
+                AddPasswordBottomSheetContent(
+                    credential = editingCredential,
+                    onDismiss = {
+
+                        coroutineScope.launch {
+                            modalSheetState.hide()
+                        }.invokeOnCompletion {
+                            showSheet = false
+                        }
+
+                    },
+                    dashboardViewmodel = dashboardViewmodel
+                )
+            }
         }
 
 
@@ -316,12 +336,6 @@ fun VaultlyBottomAppBar(
             onClick = { onItemSelected("home") },
             icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
             label = { Text("Home") }
-        )
-        NavigationBarItem(
-            selected = selectedItem == "favorites",
-            onClick = { onItemSelected("favorites") },
-            icon = { Icon(Icons.Default.FavoriteBorder, contentDescription = "Favorites") },
-            label = { Text("Favorites") }
         )
         NavigationBarItem(
             selected = selectedItem == "profile",

@@ -10,7 +10,7 @@ interface UserVaultDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdate(vault: UserVaultEntity)
 
-    @Query("SELECT * FROM user_vaults WHERE userId = :userId")
+    @Query("SELECT * FROM user_vaults WHERE userId = :userId ORDER BY updatedAt ASC")
     suspend fun getVault(userId: String): UserVaultEntity?
 
     @Query("DELETE FROM user_vaults WHERE userId = :userId")

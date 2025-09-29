@@ -13,10 +13,10 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class AuthViewModel @Inject constructor(
-    private val context: Application
+class AuthViewmodel @Inject constructor(
+    private val context: Application,
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow<WalletUiState>(WalletUiState.Idle)
+    private val _uiState = MutableStateFlow<WalletUiState>(WalletUiState.DashboardReady)
     val uiState: StateFlow<WalletUiState> = _uiState
 
     init {

@@ -6,5 +6,10 @@ enum class VaultlyRoutes(
 
     WELCOMESCREEN(route = "welcomeScreen"),
     VAULTLYBOTTOMSHEET(route = "bottomSheet"),
-    DASHBOARDSCREEN(route = "dashboardScreen")
+    DASHBOARDSCREEN(route = "dashboardScreen");
+
+    companion object {
+        const val ADD_PASSWORD_WITH_ARG = "addPasswordScreen?id={id}"
+    }
+
 }

@@ -4,20 +4,25 @@ import android.R
 import com.google.gson.annotations.SerializedName
 
 data class PinataRequest(
-    val pinataContent : VaultlyContent,
+    val pinataContent : Any,
+    val pinataMetadata: PinataMetadata? =null
 )
 
+data class PinataMetadata(
+    val name: String = "",
+    val keyValues: Map<String, String>? = null
+)
 data class PinataContentResponse(
     val content: String
 )
 
-data class OuterResponse(
-    val content: String // Treat it as a string first
+data class IpfsResponse(
+    val wallet : String,
+    val vault : VaultData
 )
 
-data class InnerContent(
-    val iv: String,
-    val cipher: String
+data class VaultData(
+    val content: String
 )
 data class VaultlyContent(
     val content : String

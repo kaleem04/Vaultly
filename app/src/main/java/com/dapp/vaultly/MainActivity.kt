@@ -7,7 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import com.dapp.vaultly.ui.theme.VaultlyTheme
-import com.dapp.vaultly.ui.viewmodels.AuthViewModel
+import com.dapp.vaultly.ui.viewmodels.AuthViewmodel
 import com.reown.android.Core
 import com.reown.android.CoreClient
 import com.reown.android.relay.ConnectionType
@@ -18,7 +18,7 @@ import dagger.hilt.android.AndroidEntryPoint
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
-    val authViewmodel by viewModels<AuthViewModel>()
+    val authViewmodel by viewModels<AuthViewmodel>()
     private val context = this
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -95,7 +95,7 @@ class MainActivity : ComponentActivity() {
 
     }
 
-    fun vaultlyDelegate(authViewModel: AuthViewModel): AppKit.ModalDelegate {
+    fun vaultlyDelegate(authViewModel: AuthViewmodel): AppKit.ModalDelegate {
         val appKitModalDelegate = object : AppKit.ModalDelegate {
             override fun onSessionApproved(approvedSession: Modal.Model.ApprovedSession) {
                 // Triggered when receives the session approval from wallet

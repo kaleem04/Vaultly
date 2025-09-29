@@ -110,7 +110,7 @@ fun DashboardScreen(
                         when(blockchainStatus){
                             is UiState.Idle -> {}
                             is UiState.Loading -> {
-                                CircularProgressIndicator()
+                             //   CircularProgressIndicator()
                             }
                             is UiState.Success -> {
                                 val blockchainStatus = (blockchainStatus as UiState.Success<String>).data
