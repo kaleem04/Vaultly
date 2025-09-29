@@ -35,15 +35,16 @@ import com.reown.appkit.client.AppKit
 fun AddPasswordBottomSheetContent(
     credential: Credential? = null,
     onDismiss: () -> Unit,
-    viewModel: AddPasswordViewmodel = hiltViewModel(),
+    viewModel: AddPasswordViewmodel,
     dashboardViewmodel: DashboardViewmodel
 ) {
     val selectedId by viewModel.selectedCredentialId.collectAsStateWithLifecycle()
-
+    //val credential by dashboardViewmodel.getCredentialById(selectedId ?: 0)
+       // .collectAsStateWithLifecycle()
     LaunchedEffect(selectedId) {
         if (selectedId != null) {
-            val credential = dashboardViewmodel.getCredentialById(selectedId!!)
-            viewModel.loadCredential(credential) // prefill fields
+
+            viewModel.loadCredential(credential ?: Credential(website = "", username = "", password = "", note = "")) // prefill fields
         } else {
             viewModel.clearFields()
         }

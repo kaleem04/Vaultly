@@ -40,6 +40,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dapp.vaultly.VaultDockedSearchBar
 import com.dapp.vaultly.data.model.Credential
 import com.dapp.vaultly.data.model.UiState
+import com.dapp.vaultly.ui.viewmodels.AddPasswordViewmodel
 import com.dapp.vaultly.ui.viewmodels.DashboardViewmodel
 import com.dapp.vaultly.util.Constants
 import com.reown.appkit.client.AppKit
@@ -48,7 +49,7 @@ import com.reown.appkit.client.AppKit
 @Composable
 fun DashboardScreen(
     dashboardViewmodel: DashboardViewmodel,
-    onItemClick: () -> Unit = {},
+    addPasswordViewmodel: AddPasswordViewmodel,
     onLogoutClick: () -> Unit = {},
     search: Boolean = false,
     contentPaddingValues: PaddingValues = PaddingValues(0.dp),
@@ -97,7 +98,12 @@ fun DashboardScreen(
                     items(credentials) { item ->
                         VaultCard(
                             item,
-                            onClick = onItemClick,
+                            onClick = {
+
+                                addPasswordViewmodel.selectCredential(item.id)
+                                addPasswordViewmodel.openSheet = true
+                                addPasswordViewmodel.editingCredential = item
+                                      },
                             onDeleteClick = {
                                 dashboardViewmodel.deleteCredential(
                                     AppKit.getAccount()?.address ?: "",
@@ -107,16 +113,19 @@ fun DashboardScreen(
                         )
                     }
                     item {
-                        when(blockchainStatus){
+                        when (blockchainStatus) {
                             is UiState.Idle -> {}
                             is UiState.Loading -> {
-                             //   CircularProgressIndicator()
+                                //   CircularProgressIndicator()
                             }
+
                             is UiState.Success -> {
-                                val blockchainStatus = (blockchainStatus as UiState.Success<String>).data
+                                val blockchainStatus =
+                                    (blockchainStatus as UiState.Success<String>).data
 
                                 Text(text = blockchainStatus)
                             }
+
                             is UiState.Error -> {
                                 val error = (blockchainStatus as UiState.Error).message
                                 Text(text = error)
@@ -196,7 +205,7 @@ fun VaultCard(
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Text(
-                    text = Constants.formatDate(credential.createdAt),
+                    text = Constants.formatDate(credential.updatedAt),
                     style = MaterialTheme.typography.bodySmall,
                 )
 

@@ -39,18 +39,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
 import com.dapp.vaultly.data.model.Credential
 import com.dapp.vaultly.data.model.VaultlyRoutes
 import com.dapp.vaultly.data.model.WalletUiState
 import com.dapp.vaultly.ui.screens.AddPasswordBottomSheetContent
 import com.dapp.vaultly.ui.screens.DashboardScreen
 import com.dapp.vaultly.ui.screens.WelcomeScreen
+import com.dapp.vaultly.ui.viewmodels.AddPasswordViewmodel
 import com.dapp.vaultly.ui.viewmodels.AuthViewmodel
 import com.dapp.vaultly.ui.viewmodels.DashboardViewmodel
 import com.google.accompanist.navigation.material.ExperimentalMaterialNavigationApi
@@ -61,6 +60,10 @@ import com.reown.appkit.ui.components.internal.AppKitComponent
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 
+val noBottomNavRoutes = listOf(
+    VaultlyRoutes.WELCOMESCREEN.name,
+    VaultlyRoutes.VAULTLYBOTTOMSHEET.name
+)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialNavigationApi::class)
 
@@ -68,8 +71,8 @@ import org.json.JSONArray
 fun VaultlyApp(
     authViewmodel: AuthViewmodel
 ) {
-    var editingCredential by remember { mutableStateOf<Credential?>(null) }
 
+    val addPasswordViewmodel: AddPasswordViewmodel = hiltViewModel()
     val coroutineScope = rememberCoroutineScope()
     val modalSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val navController = rememberNavController()
@@ -78,10 +81,7 @@ fun VaultlyApp(
     var onSearchClick by rememberSaveable { mutableStateOf(false) }
     var showSheet by rememberSaveable { mutableStateOf(false) }
     val authState by authViewmodel.uiState.collectAsStateWithLifecycle()
-    val noBottomNavRoutes = listOf(
-        VaultlyRoutes.WELCOMESCREEN.name,
-        VaultlyRoutes.VAULTLYBOTTOMSHEET.name
-    )
+
     val shouldShowBars = noBottomNavRoutes.none { route ->
         currentRoute?.startsWith(route) == true
     }
@@ -94,7 +94,8 @@ fun VaultlyApp(
                         onSearchClick = !onSearchClick
                     },
                     onAddClick = {
-                        showSheet = true
+                        addPasswordViewmodel.editingCredential = null
+                        addPasswordViewmodel.openSheet = true
                     },
                     onSettingsClick = {},
                     isSearchActive = onSearchClick
@@ -151,9 +152,7 @@ fun VaultlyApp(
                         )
                     } else {
                         DashboardScreen(
-                            onItemClick = {
-                                Log.d("@@", "Item clicked: $it")
-                            },
+                            addPasswordViewmodel = addPasswordViewmodel,
                             onLogoutClick = {
 
                                 AppKit.disconnect(
@@ -179,29 +178,30 @@ fun VaultlyApp(
                 }
             }
         }
-        if (showSheet) {
+        if (addPasswordViewmodel.openSheet) {
             ModalBottomSheet(
                 sheetState = modalSheetState,
                 onDismissRequest = {
                     coroutineScope.launch {
                         modalSheetState.hide()
                     }.invokeOnCompletion {
-                        showSheet = false
+                        addPasswordViewmodel.openSheet = false
                     }
                 },
             ) {
                 AddPasswordBottomSheetContent(
-                    credential = editingCredential,
+                    credential = addPasswordViewmodel.editingCredential,
                     onDismiss = {
 
                         coroutineScope.launch {
                             modalSheetState.hide()
                         }.invokeOnCompletion {
-                            showSheet = false
+                            addPasswordViewmodel.openSheet= false
                         }
 
                     },
-                    dashboardViewmodel = dashboardViewmodel
+                    dashboardViewmodel = dashboardViewmodel,
+                    viewModel = addPasswordViewmodel
                 )
             }
         }

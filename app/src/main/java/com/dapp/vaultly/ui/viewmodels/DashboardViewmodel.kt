@@ -3,7 +3,6 @@ package com.dapp.vaultly.ui.viewmodels
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.dapp.vaultly.data.local.UserVaultEntity
 import com.dapp.vaultly.data.model.Credential
 import com.dapp.vaultly.data.model.UiState
 import com.dapp.vaultly.data.repository.PolygonRepository
@@ -12,8 +11,11 @@ import com.dapp.vaultly.util.Constants.CONTRACT_ADDRESS
 import com.reown.appkit.client.AppKit
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -53,17 +55,27 @@ class DashboardViewmodel @Inject constructor(
             }
         }
     }
-    fun getCredentialById(id: String): Credential? {
-        return _credentials.value.find { it.id == id }
+
+    fun getCredentialById(id: Int): StateFlow<Credential?> {
+        return _credentials.map { uiState ->
+            when (uiState) {
+                is UiState.Success -> uiState.data.find { it.id == id }
+                else -> null
+            }
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = null
+        )
     }
 
     /** Force sync: Polygon → Pinata → DB */
-     fun refreshFromBlockchain(userId: String) {
+    fun refreshFromBlockchain(userId: String) {
         viewModelScope.launch {
             _blockchainState.value = UiState.Loading
             try {
                 // 1. Get CID from Polygon
-               // val cid = polygonRepository.getCid(userId)
+                // val cid = polygonRepository.getCid(userId)
 //                _blockchainState.value = UiState.Success(cid)
 //                Log.d("DashboardVM", "CID fetched: $cid")
 //
@@ -95,9 +107,9 @@ class DashboardViewmodel @Inject constructor(
                 if (cid.isNotEmpty()) {
                     // 2. Fetch content from Pinata
                     val content = vaultRepo.getContentFromPinata(cid)
-                    Log.d("@@","$content")
+                    Log.d("@@", "$content")
                     // 3. Store into Room (UI updates automatically from DB observer)
-                    if(content.isNotEmpty()) {
+                    if (content.isNotEmpty()) {
                         vaultRepo.saveContentInDb(userId, cid, content)
                         Log.d("DashboardVM", "Content saved in DB successfully")
                     }
