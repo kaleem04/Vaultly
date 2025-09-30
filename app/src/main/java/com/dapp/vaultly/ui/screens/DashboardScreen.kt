@@ -43,6 +43,7 @@ import com.dapp.vaultly.data.model.UiState
 import com.dapp.vaultly.ui.viewmodels.AddPasswordViewmodel
 import com.dapp.vaultly.ui.viewmodels.DashboardViewmodel
 import com.dapp.vaultly.util.Constants
+import com.dapp.vaultly.util.Constants.WALLET_ADDRESS
 import com.reown.appkit.client.AppKit
 
 
@@ -58,6 +59,13 @@ fun DashboardScreen(
     var query by remember { mutableStateOf("") }
     val uiState by dashboardViewmodel.credentials.collectAsStateWithLifecycle()
     val blockchainStatus by dashboardViewmodel.blockchain.collectAsStateWithLifecycle()
+    val addCidToPolygonState by dashboardViewmodel.addCidToPolygonState.collectAsStateWithLifecycle()
+    val buttonState = when (addCidToPolygonState) {
+        is UiState.Idle -> ButtonState.Idle
+        is UiState.Loading -> ButtonState.Loading
+        is UiState.Success -> ButtonState.Success
+        is UiState.Error -> ButtonState.Failed("Failed To Add")
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -103,7 +111,7 @@ fun DashboardScreen(
                                 addPasswordViewmodel.selectCredential(item.id)
                                 addPasswordViewmodel.openSheet = true
                                 addPasswordViewmodel.editingCredential = item
-                                      },
+                            },
                             onDeleteClick = {
                                 dashboardViewmodel.deleteCredential(
                                     AppKit.getAccount()?.address ?: "",
@@ -140,13 +148,17 @@ fun DashboardScreen(
                             Text(text = "Logout")
                         }
                     }
-//                    item {
-//                        Button(
-//                            onClick = onRequestSignature
-//                        ) {
-//                            Text(text = "Logout")
-//                        }
-//                    }
+                    item {
+                        CustomButton(
+                            state = buttonState,
+                            onClick = {
+                                dashboardViewmodel.addCidToPolygon(
+                                    dashboardViewmodel.currentCid
+                                )
+                            },
+                            idleText = "Sync to Blockchain"
+                        )
+                    }
                 }
 
             }

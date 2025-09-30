@@ -43,15 +43,16 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.dapp.vaultly.data.model.Credential
 import com.dapp.vaultly.data.model.VaultlyRoutes
 import com.dapp.vaultly.data.model.WalletUiState
 import com.dapp.vaultly.ui.screens.AddPasswordBottomSheetContent
 import com.dapp.vaultly.ui.screens.DashboardScreen
+import com.dapp.vaultly.ui.screens.ProfileScreen
 import com.dapp.vaultly.ui.screens.WelcomeScreen
 import com.dapp.vaultly.ui.viewmodels.AddPasswordViewmodel
 import com.dapp.vaultly.ui.viewmodels.AuthViewmodel
 import com.dapp.vaultly.ui.viewmodels.DashboardViewmodel
+import com.dapp.vaultly.util.Constants.WALLET_ADDRESS
 import com.google.accompanist.navigation.material.ExperimentalMaterialNavigationApi
 import com.reown.appkit.client.AppKit
 import com.reown.appkit.client.models.request.Request
@@ -106,14 +107,19 @@ fun VaultlyApp(
         bottomBar = {
             if (shouldShowBars) {
                 VaultlyBottomAppBar(
-                    selectedItem = "home",
-                    onItemSelected = {}
+                    selectedItem = currentRoute ?: "",
+                    onHomeClick = {
+                        navController.navigate(VaultlyRoutes.DASHBOARDSCREEN.name)
+                    },
+                    onProfileClick = {
+                        navController.navigate(VaultlyRoutes.PROFILESCREEN.name)
+                    }
                 )
             }
         },
     ) { paddingValues ->
         // Collect events from AppEventBus
-        Box {
+
             NavHost(
                 navController = navController,
                 startDestination = when (authState) {
@@ -176,8 +182,21 @@ fun VaultlyApp(
                         )
                     }
                 }
+
+                composable(route = VaultlyRoutes.PROFILESCREEN.name) {
+                    ProfileScreen(
+                        walletAddress = WALLET_ADDRESS,
+                        userName = "",
+                        onThemeClick = {},
+                        onLanguageClick = {},
+                        onLogoutClick = {
+                            authViewmodel.onLogout()
+                        },
+                        contentPaddingValues = paddingValues
+                    )
+                }
             }
-        }
+
         if (addPasswordViewmodel.openSheet) {
             ModalBottomSheet(
                 sheetState = modalSheetState,
@@ -196,7 +215,7 @@ fun VaultlyApp(
                         coroutineScope.launch {
                             modalSheetState.hide()
                         }.invokeOnCompletion {
-                            addPasswordViewmodel.openSheet= false
+                            addPasswordViewmodel.openSheet = false
                         }
 
                     },
@@ -328,18 +347,19 @@ fun VaultlyTopAppBar(
 @Composable
 fun VaultlyBottomAppBar(
     selectedItem: String,
-    onItemSelected: (String) -> Unit
+    onHomeClick: () -> Unit,
+    onProfileClick : () -> Unit
 ) {
     NavigationBar {
         NavigationBarItem(
-            selected = selectedItem == "home",
-            onClick = { onItemSelected("home") },
+            selected = selectedItem == VaultlyRoutes.DASHBOARDSCREEN.name,
+            onClick = onHomeClick,
             icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
             label = { Text("Home") }
         )
         NavigationBarItem(
-            selected = selectedItem == "profile",
-            onClick = { onItemSelected("profile") },
+            selected = selectedItem == VaultlyRoutes.PROFILESCREEN.name,
+            onClick = onProfileClick,
             icon = { Icon(Icons.Default.Person, contentDescription = "Profile") },
             label = { Text("Profile") }
         )

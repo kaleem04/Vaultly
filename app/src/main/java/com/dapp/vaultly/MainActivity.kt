@@ -139,7 +139,7 @@ class MainActivity : ComponentActivity() {
 
             override fun onSessionRequestResponse(response: Modal.Model.SessionRequestResponse) {
                 // Triggered when receives the session request response from wallet
-                Log.d("@@", "onSessionRequestResponse: $response")
+                Log.d("@@S", "onSessionRequestResponse: $response")
 
                 when (val result = response.result) {
                     is Modal.Model.JsonRpcResponse.JsonRpcResult -> {

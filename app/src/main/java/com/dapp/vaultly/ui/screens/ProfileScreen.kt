@@ -2,6 +2,7 @@ package com.dapp.vaultly.ui.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,13 +35,16 @@ fun ProfileScreen(
     userName: String? = null,
     onThemeClick: () -> Unit,
     onLanguageClick: () -> Unit,
-    onLogoutClick: () -> Unit
+    onLogoutClick: () -> Unit,
+    contentPaddingValues: PaddingValues = PaddingValues(0.dp)
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
+            .padding(contentPaddingValues)
             .padding(16.dp),
+
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Avatar + User Info
@@ -144,5 +148,6 @@ fun ProfileScreenPreview() {
         onLogoutClick = {}
     )
 }
+
 
 

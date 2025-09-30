@@ -48,6 +48,7 @@ class UserVaultRepository(
 
     suspend fun getContentFromPinata(cid: String): String {
         val response = ipfsGatewayService.getJsonFromIpfs(cid)
+        Log.d("@@",response.toString())
         return response.vault.content
     }
 
@@ -160,30 +161,43 @@ class UserVaultRepository(
                 )
                 val data = FunctionEncoder.encode(function)
 
-                val txObject = mapOf(
-                    "from" to account,
-                    "to" to contractAddress,
-                    "data" to data,
-                    "value" to "0x0"
-                )
+                // Build tx JSON
+                val txObject = JSONObject().apply {
+                    put("from", account)
+                    put("to", contractAddress)
+                    put("data", data)
+                    put("value", "0x0")
+                    put("gas", "0x2dc6c0") // ~3M gas
+                }
 
-                val params = listOf(txObject).toString()
+                // Params must be a JSON array string: [ { ... } ]
+                val params = JSONArray().apply {
+                    put(txObject)
+                }.toString()
+
+                Log.d("SaveCid", "Transaction params JSON: $params")
 
                 val request = Request(
                     method = "eth_sendTransaction",
-                    params = params
+                    params = params,   // ✅ pass JSON string
+                    expiry = null
                 )
+
+                Log.d("SaveCid", "Request: method=${request.method}, params=${request.params}")
 
                 AppKit.request(
                     request,
                     onSuccess = { txHash ->
+                        Log.d("SaveCid", "Transaction success: $txHash")
                         cont.resume(txHash.toString()) {}
                     },
                     onError = { error ->
+                        Log.e("SaveCid", "Transaction error: $error")
                         cont.resumeWithException(Exception(error))
                     }
                 )
             } catch (e: Exception) {
+                Log.e("SaveCid", "Exception while sending tx", e)
                 cont.resumeWithException(e)
             }
         }

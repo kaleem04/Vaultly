@@ -49,14 +49,17 @@ class PolygonRepository(
             )
             val utf8Ref: TypeReference<Utf8String> = TypeReference.create(Utf8String::class.java)
             // Decode CID from hex
-            val decoded = FunctionReturnDecoder.decode(
-                response.result,
-                listOf(object : TypeReference<Utf8String>() {}) as List<TypeReference<Type<*>>>
+             if (response != null) {
+                 val decoded = FunctionReturnDecoder.decode(
+                     response.result,
+                     listOf(object : TypeReference<Utf8String>() {}) as List<TypeReference<Type<*>>>
 
-            )
-            cid = decoded.firstOrNull()?.value as? String ?: ""
+                 )
+                 cid = decoded.firstOrNull()?.value as? String ?: ""
 
-
+             }else{
+                 Log.d("POLYGONREPOSITORY","RESPONSE IS NULL $response")
+             }
         } catch (e: Exception) {
             Log.e(TAG, "getCid error: ${e.localizedMessage}", e)
 

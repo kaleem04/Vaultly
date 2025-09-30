@@ -6,6 +6,7 @@ enum class VaultlyRoutes(
 
     WELCOMESCREEN(route = "welcomeScreen"),
     VAULTLYBOTTOMSHEET(route = "bottomSheet"),
+    PROFILESCREEN(route = "profileScreen"),
     DASHBOARDSCREEN(route = "dashboardScreen");
 
     companion object {
