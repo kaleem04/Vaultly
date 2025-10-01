@@ -43,7 +43,6 @@ import com.dapp.vaultly.data.model.UiState
 import com.dapp.vaultly.ui.viewmodels.AddPasswordViewmodel
 import com.dapp.vaultly.ui.viewmodels.DashboardViewmodel
 import com.dapp.vaultly.util.Constants
-import com.dapp.vaultly.util.Constants.WALLET_ADDRESS
 import com.reown.appkit.client.AppKit
 
 

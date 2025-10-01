@@ -12,14 +12,10 @@ import com.dapp.vaultly.data.repository.PolygonRepository
 import com.dapp.vaultly.data.repository.UserVaultRepository
 import com.dapp.vaultly.util.Constants.CONTRACT_ADDRESS
 import com.dapp.vaultly.util.Constants.WALLET_ADDRESS
-import com.reown.appkit.client.AppKit
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -35,7 +31,7 @@ class DashboardViewmodel @Inject constructor(
     private val _addPasswordUiState = MutableStateFlow<UiState<Unit>>(UiState.Idle)
     val addPasswordUiState: StateFlow<UiState<Unit>> = _addPasswordUiState.asStateFlow()
 
-    var currentCid by mutableStateOf<String>("")
+    var currentCid by mutableStateOf(vaultRepo.currentCid)
 
 
     private val _blockchainState = MutableStateFlow<UiState<String>>(UiState.Idle)
@@ -45,11 +41,12 @@ class DashboardViewmodel @Inject constructor(
     val addCidToPolygonState: StateFlow<UiState<String>> = _addCidToPolygonState.asStateFlow()
 
     init {
-        val userId = AppKit.getAccount()?.address ?: ""
+        val userId = WALLET_ADDRESS
         // 1. Load from Room (offline-first)
         loadCredentials(userId)
         // 2. Refresh from Polygon + Pinata (network sync)
         refreshFromBlockchain(userId)
+        Log.d("DashboardVM", "current cid :$currentCid")
     }
 
     /** Load from Room only */
@@ -66,18 +63,6 @@ class DashboardViewmodel @Inject constructor(
         }
     }
 
-    fun getCredentialById(id: Int): StateFlow<Credential?> {
-        return _credentials.map { uiState ->
-            when (uiState) {
-                is UiState.Success -> uiState.data.find { it.id == id }
-                else -> null
-            }
-        }.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = null
-        )
-    }
 
     /** Force sync: Polygon → Pinata → DB */
     fun refreshFromBlockchain(userId: String) {
@@ -112,7 +97,7 @@ class DashboardViewmodel @Inject constructor(
             _addPasswordUiState.value = UiState.Loading
             try {
                 val cid = vaultRepo.addOrUpdateCredential(userId, credential)
-                currentCid = cid
+
                 _addPasswordUiState.value = UiState.Success(Unit)
 
                 if (cid.isNotEmpty()) {

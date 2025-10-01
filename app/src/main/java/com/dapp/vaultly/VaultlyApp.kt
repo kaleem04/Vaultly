@@ -1,7 +1,6 @@
 package com.dapp.vaultly
 
 import android.util.Log
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -10,7 +9,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DockedSearchBar
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -52,6 +50,7 @@ import com.dapp.vaultly.ui.screens.WelcomeScreen
 import com.dapp.vaultly.ui.viewmodels.AddPasswordViewmodel
 import com.dapp.vaultly.ui.viewmodels.AuthViewmodel
 import com.dapp.vaultly.ui.viewmodels.DashboardViewmodel
+import com.dapp.vaultly.ui.viewmodels.VaultlyThemeViewmodel
 import com.dapp.vaultly.util.Constants.WALLET_ADDRESS
 import com.google.accompanist.navigation.material.ExperimentalMaterialNavigationApi
 import com.reown.appkit.client.AppKit
@@ -70,7 +69,8 @@ val noBottomNavRoutes = listOf(
 
 @Composable
 fun VaultlyApp(
-    authViewmodel: AuthViewmodel
+    authViewmodel: AuthViewmodel,
+    vaultlyThemeViewmodel: VaultlyThemeViewmodel
 ) {
 
     val addPasswordViewmodel: AddPasswordViewmodel = hiltViewModel()
@@ -98,7 +98,6 @@ fun VaultlyApp(
                         addPasswordViewmodel.editingCredential = null
                         addPasswordViewmodel.openSheet = true
                     },
-                    onSettingsClick = {},
                     isSearchActive = onSearchClick
 
                 )
@@ -120,82 +119,80 @@ fun VaultlyApp(
     ) { paddingValues ->
         // Collect events from AppEventBus
 
-            NavHost(
-                navController = navController,
-                startDestination = when (authState) {
-                    WalletUiState.Idle -> VaultlyRoutes.WELCOMESCREEN.name
-                    WalletUiState.Welcome -> VaultlyRoutes.WELCOMESCREEN.name
-                    WalletUiState.DashboardReady -> VaultlyRoutes.DASHBOARDSCREEN.name
-                    is WalletUiState.DashboardPendingSignature -> VaultlyRoutes.DASHBOARDSCREEN.name
-                    else -> VaultlyRoutes.WELCOMESCREEN.name
+        NavHost(
+            navController = navController,
+            startDestination = when (authState) {
+                WalletUiState.Idle -> VaultlyRoutes.WELCOMESCREEN.name
+                WalletUiState.Welcome -> VaultlyRoutes.WELCOMESCREEN.name
+                WalletUiState.DashboardReady -> VaultlyRoutes.DASHBOARDSCREEN.name
+                is WalletUiState.DashboardPendingSignature -> VaultlyRoutes.DASHBOARDSCREEN.name
+                else -> VaultlyRoutes.WELCOMESCREEN.name
+            }
+
+        ) {
+            composable(VaultlyRoutes.WELCOMESCREEN.name) {
+                WelcomeScreen {
+                    navController.navigate(VaultlyRoutes.VAULTLYBOTTOMSHEET.name)
                 }
+            }
+            composable(VaultlyRoutes.VAULTLYBOTTOMSHEET.name) {
+                VaultlyBottomSheet(
+                    onDismiss = {
+                        navController.popBackStack()
+                    },
 
-            ) {
-                composable(VaultlyRoutes.WELCOMESCREEN.name) {
-                    WelcomeScreen {
-                        navController.navigate(VaultlyRoutes.VAULTLYBOTTOMSHEET.name)
-                    }
-                }
-                composable(VaultlyRoutes.VAULTLYBOTTOMSHEET.name) {
-                    VaultlyBottomSheet(
-                        onDismiss = {
-                            navController.popBackStack()
-                        },
+                    )
+            }
+            composable(VaultlyRoutes.DASHBOARDSCREEN.name) {
+                if (authState is WalletUiState.DashboardPendingSignature) {
 
-                        )
-                }
-                composable(VaultlyRoutes.DASHBOARDSCREEN.name) {
-                    if (authState is WalletUiState.DashboardPendingSignature) {
-
-                        SignatureDialog(
-                            address = AppKit.getAccount()?.address.toString(),
-                            onConfirm = {
-                                requestPersonalSign(AppKit.getAccount()?.address)
-                            }
-                        )
-                        dashboardViewmodel.refreshFromBlockchain(
-                            userId = AppKit.getAccount()?.address ?: ""
-                        )
-                    } else {
-                        DashboardScreen(
-                            addPasswordViewmodel = addPasswordViewmodel,
-                            onLogoutClick = {
-
-                                AppKit.disconnect(
-                                    onSuccess = {
-                                        Log.d("@@", "Logout SuccessFull")
-
-
-                                    },
-                                    onError = {
-                                        Log.d("@@", "Logout Failed")
-                                    }
-                                )
-
-                                //navController.navigate(VaultlyRoutes.WELCOMESCREEN.name)
-                                authViewmodel.onLogout()
-
-                            },
-                            search = onSearchClick,
-                            contentPaddingValues = paddingValues,
-                            dashboardViewmodel = dashboardViewmodel
-                        )
-                    }
-                }
-
-                composable(route = VaultlyRoutes.PROFILESCREEN.name) {
-                    ProfileScreen(
-                        walletAddress = WALLET_ADDRESS,
-                        userName = "",
-                        onThemeClick = {},
-                        onLanguageClick = {},
+                    SignatureDialog(
+                        address = WALLET_ADDRESS,
+                        onConfirm = {
+                            requestPersonalSign(WALLET_ADDRESS)
+                        }
+                    )
+                    dashboardViewmodel.refreshFromBlockchain(
+                        userId = WALLET_ADDRESS
+                    )
+                } else {
+                    DashboardScreen(
+                        addPasswordViewmodel = addPasswordViewmodel,
                         onLogoutClick = {
+
+                            AppKit.disconnect(
+                                onSuccess = {
+                                    Log.d("@@", "Logout SuccessFull")
+
+
+                                },
+                                onError = {
+                                    Log.d("@@", "Logout Failed")
+                                }
+                            )
                             authViewmodel.onLogout()
+
                         },
-                        contentPaddingValues = paddingValues
+                        search = onSearchClick,
+                        contentPaddingValues = paddingValues,
+                        dashboardViewmodel = dashboardViewmodel
                     )
                 }
             }
+
+            composable(route = VaultlyRoutes.PROFILESCREEN.name) {
+                ProfileScreen(
+                    vaultlyThemeViewmodel = vaultlyThemeViewmodel,
+                    walletAddress = WALLET_ADDRESS,
+                    userName = "",
+                    onThemeClick = {},
+                    onLogoutClick = {
+                        authViewmodel.onLogout()
+                    },
+                    contentPaddingValues = paddingValues
+                )
+            }
+        }
 
         if (addPasswordViewmodel.openSheet) {
             ModalBottomSheet(
@@ -316,7 +313,6 @@ fun VaultDockedSearchBar(
 fun VaultlyTopAppBar(
     onSearchClick: () -> Unit,
     onAddClick: () -> Unit,
-    onSettingsClick: () -> Unit,
     isSearchActive: Boolean = false
 ) {
     TopAppBar(
@@ -337,9 +333,7 @@ fun VaultlyTopAppBar(
             IconButton(onClick = onAddClick) {
                 Icon(Icons.Default.Add, contentDescription = "Add Password")
             }
-            IconButton(onClick = onSettingsClick) {
-                Icon(Icons.Default.Settings, contentDescription = "Settings")
-            }
+
         }
     )
 }
@@ -348,7 +342,7 @@ fun VaultlyTopAppBar(
 fun VaultlyBottomAppBar(
     selectedItem: String,
     onHomeClick: () -> Unit,
-    onProfileClick : () -> Unit
+    onProfileClick: () -> Unit
 ) {
     NavigationBar {
         NavigationBarItem(

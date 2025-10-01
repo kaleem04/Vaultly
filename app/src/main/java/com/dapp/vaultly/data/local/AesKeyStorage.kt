@@ -10,27 +10,29 @@ import kotlinx.coroutines.flow.map
 import java.util.Base64
 import javax.crypto.SecretKey
 import javax.crypto.spec.SecretKeySpec
-val Context.dataStore by preferencesDataStore("user_preferences")
+val Context.userPrefrencesDatastore by preferencesDataStore("user_preferences")
 object AesKeyStorage {
     private val AES_KEY = stringPreferencesKey("aes_key")
 
+
     fun readKey(context: Context): Flow<SecretKey?> {
-        return context.dataStore.data.map { prefs ->
+        return context.userPrefrencesDatastore.data.map { prefs ->
             prefs[AES_KEY]?.let { encoded ->
                 val bytes = Base64.getDecoder().decode(encoded)
                 SecretKeySpec(bytes, "AES")
             }
         }
+
     }
 
     suspend fun saveKey(context: Context, key: SecretKey) {
-        context.dataStore.edit { prefs ->
+        context.userPrefrencesDatastore.edit { prefs ->
             prefs[AES_KEY] = Base64.getEncoder().encodeToString(key.encoded)
         }
     }
 
     suspend fun clearKey(context: Context) {
-        context.dataStore.edit { prefs ->
+        context.userPrefrencesDatastore.edit { prefs ->
             prefs.remove(AES_KEY)
         }
     }

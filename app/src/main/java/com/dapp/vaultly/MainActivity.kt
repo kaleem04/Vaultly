@@ -8,6 +8,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import com.dapp.vaultly.ui.theme.VaultlyTheme
 import com.dapp.vaultly.ui.viewmodels.AuthViewmodel
+import com.dapp.vaultly.ui.viewmodels.VaultlyThemeViewmodel
 import com.reown.android.Core
 import com.reown.android.CoreClient
 import com.reown.android.relay.ConnectionType
@@ -19,6 +20,7 @@ import dagger.hilt.android.AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     val authViewmodel by viewModels<AuthViewmodel>()
+    val themeViewmodel by viewModels<VaultlyThemeViewmodel>()
     private val context = this
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -86,8 +88,8 @@ class MainActivity : ComponentActivity() {
 
         enableEdgeToEdge()
         setContent {
-            VaultlyTheme {
-                VaultlyApp(authViewmodel)
+            VaultlyTheme(vaultlyThemeViewmodel = themeViewmodel) {
+                VaultlyApp(authViewmodel, themeViewmodel)
 
             }
         }

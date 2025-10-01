@@ -1,6 +1,9 @@
 package com.dapp.vaultly.data.repository
 
 import android.util.Log
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.dapp.vaultly.data.local.UserVaultDao
 import com.dapp.vaultly.data.local.UserVaultEntity
 import com.dapp.vaultly.data.model.Credential
@@ -29,9 +32,14 @@ class UserVaultRepository(
     private val secretKey: SecretKey
 ) {
 
+    var currentCid by mutableStateOf("")
+
     // Get all credentials for user
     suspend fun getCredentials(userId: String): List<Credential> {
         val vault = vaultDao.getVault(userId) ?: return emptyList()
+        if (vault.cid.isNotEmpty()) {
+            currentCid = vault.cid
+        }
         val decryptedJson = CryptoUtil.decryptBlob(vault.encryptedBlob, secretKey)
         val jsonArray = JSONArray(decryptedJson)
         Log.d("@@", jsonArray.toString())
@@ -48,7 +56,7 @@ class UserVaultRepository(
 
     suspend fun getContentFromPinata(cid: String): String {
         val response = ipfsGatewayService.getJsonFromIpfs(cid)
-        Log.d("@@",response.toString())
+        Log.d("@@", response.toString())
         return response.vault.content
     }
 
@@ -92,14 +100,14 @@ class UserVaultRepository(
             "wallet" to WALLET_ADDRESS,
             "vault" to vaultlycontent
         )
-       val  pinataMetadata = PinataMetadata(
-           name = "vault_${WALLET_ADDRESS}.json",
-           keyValues = mapOf(
-               "wallet" to WALLET_ADDRESS,
-               "type" to "vault"
-           )
-       )
-           val response = pinata.pinJsonToIpfs(PinataRequest(content,pinataMetadata))
+        val pinataMetadata = PinataMetadata(
+            name = "vault_${WALLET_ADDRESS}.json",
+            keyValues = mapOf(
+                "wallet" to WALLET_ADDRESS,
+                "type" to "vault"
+            )
+        )
+        val response = pinata.pinJsonToIpfs(PinataRequest(content, pinataMetadata))
 
         vaultDao.insertOrUpdate(
             UserVaultEntity(
