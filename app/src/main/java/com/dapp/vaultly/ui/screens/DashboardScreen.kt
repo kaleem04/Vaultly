@@ -50,7 +50,6 @@ import com.reown.appkit.client.AppKit
 fun DashboardScreen(
     dashboardViewmodel: DashboardViewmodel,
     addPasswordViewmodel: AddPasswordViewmodel,
-    onLogoutClick: () -> Unit = {},
     search: Boolean = false,
     contentPaddingValues: PaddingValues = PaddingValues(0.dp),
     modifier: Modifier = Modifier,
@@ -141,19 +140,10 @@ fun DashboardScreen(
 
                     }
                     item {
-                        Button(
-                            onClick = onLogoutClick
-                        ) {
-                            Text(text = "Logout")
-                        }
-                    }
-                    item {
                         CustomButton(
                             state = buttonState,
                             onClick = {
-                                dashboardViewmodel.addCidToPolygon(
-                                    dashboardViewmodel.currentCid
-                                )
+                                dashboardViewmodel.addCidToPolygon()
                             },
                             idleText = "Sync to Blockchain"
                         )

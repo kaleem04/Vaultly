@@ -2,6 +2,7 @@ package com.dapp.vaultly.data.model
 
 import android.R
 import com.google.gson.annotations.SerializedName
+import com.reown.appkit.client.AppKit
 
 data class PinataRequest(
     val pinataContent : Any,
@@ -17,7 +18,7 @@ data class PinataContentResponse(
 )
 
 data class IpfsResponse(
-    val wallet : String,
+    val wallet : String = AppKit.getAccount()?.address ?: "",
     val vault : VaultData
 )
 

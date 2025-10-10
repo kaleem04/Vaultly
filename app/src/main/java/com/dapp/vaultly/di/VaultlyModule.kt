@@ -20,6 +20,7 @@ import com.dapp.vaultly.util.CryptoUtil
 import com.dapp.vaultly.util.IpfsGateway
 import com.dapp.vaultly.util.PinataApi
 import com.dapp.vaultly.util.PolygonApi
+import com.reown.appkit.client.AppKit
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -163,7 +164,7 @@ object VaultlyModule {
     @Provides
     @Singleton
     fun provideSecretKey(): SecretKey {
-        return CryptoUtil.deriveAesKeyFromSignature(TEST_SIGNATURE)
+        return CryptoUtil.deriveAesKeyFromSignature(AppKit.getAccount()?.address ?: "")
     }
 
 
@@ -197,13 +198,14 @@ object VaultlyModule {
         userVaultDao: UserVaultDao,
         pinataApiService: PinataApiService,
         ipfsGatewayService: IpfsGatewayService,
-        secretKey: SecretKey
+       @ApplicationContext context: Context
+
     ): UserVaultRepository {
         return UserVaultRepository(
             vaultDao = userVaultDao,
             pinata = pinataApiService,
             ipfsGatewayService = ipfsGatewayService,
-            secretKey = secretKey
+            context = context
         )
     }
 

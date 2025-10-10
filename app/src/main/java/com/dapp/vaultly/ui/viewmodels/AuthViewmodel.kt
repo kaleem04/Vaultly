@@ -1,6 +1,7 @@
 package com.dapp.vaultly.ui.viewmodels
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dapp.vaultly.data.local.AesKeyStorage
@@ -41,6 +42,7 @@ class AuthViewmodel @Inject constructor(
     fun onSignatureApproved(signature: String) {
         viewModelScope.launch {
             val aesKey = CryptoUtil.deriveAesKeyFromSignature(signature)
+            Log.d("@@","AES Key: $aesKey")
             AesKeyStorage.saveKey(context, aesKey)
             _uiState.value = WalletUiState.DashboardReady
         }

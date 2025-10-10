@@ -13,6 +13,8 @@ interface UserVaultDao {
     @Query("SELECT * FROM user_vaults WHERE userId = :userId ORDER BY updatedAt ASC")
     suspend fun getVault(userId: String): UserVaultEntity?
 
+    @Query("SELECT cid FROM user_vaults WHERE userId = :userId")
+    suspend fun getCid(userId: String) : String
     @Query("DELETE FROM user_vaults WHERE userId = :userId")
     suspend fun deleteVault(userId: String)
 }

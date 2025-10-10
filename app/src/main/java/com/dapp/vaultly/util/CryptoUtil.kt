@@ -1,5 +1,6 @@
 package com.dapp.vaultly.util
 
+import android.util.Log
 import org.json.JSONObject
 import java.security.SecureRandom
 import java.util.Base64
@@ -99,6 +100,10 @@ object CryptoUtil {
 
     fun encryptBlob(plainText: String, key: SecretKey): String {
         val (iv, cipher) = encrypt(plainText, key)
+        Log.d("@@", "IV: $iv, Cipher: $cipher")
+        Log.d("@@","encrypt secret : ${key.format}")
+
+
         val obj = JSONObject().apply {
             put("iv", iv)
             put("cipher", cipher)
@@ -108,6 +113,9 @@ object CryptoUtil {
 
     fun decryptBlob(blob: String, key: SecretKey): String {
         val obj = JSONObject(blob)
+        Log.d("@@", "blob : $blob. iv: ${obj.getString("iv")}, cipher: ${obj.getString("cipher")}")
+        Log.d("@@","decrypt secret : ${key.format}")
+
         return decrypt(obj.getString("iv"), obj.getString("cipher"), key)
     }
 

@@ -149,7 +149,7 @@ class MainActivity : ComponentActivity() {
                         Log.d("@@", "✅ Signature received: $signature")
 
                         // 🔑 Derive AES key
-                        authViewmodel.onSignatureApproved(signature)
+                        authViewmodel.onSignatureApproved(AppKit.getAccount()?.address ?: "")
 
                         Log.d("@@", "AES key derived & stored in memory")
                     }

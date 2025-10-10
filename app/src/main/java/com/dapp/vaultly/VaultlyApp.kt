@@ -147,32 +147,17 @@ fun VaultlyApp(
                 if (authState is WalletUiState.DashboardPendingSignature) {
 
                     SignatureDialog(
-                        address = WALLET_ADDRESS,
+                        address = AppKit.getAccount()?.address ?: "",
                         onConfirm = {
-                            requestPersonalSign(WALLET_ADDRESS)
+                            requestPersonalSign(AppKit.getAccount()?.address ?: "")
                         }
                     )
-                    dashboardViewmodel.refreshFromBlockchain(
-                        userId = WALLET_ADDRESS
-                    )
+//                    dashboardViewmodel.refreshFromBlockchain(
+//                        userId = AppKit.getAccount()?.address ?: "",
+//                    )
                 } else {
                     DashboardScreen(
                         addPasswordViewmodel = addPasswordViewmodel,
-                        onLogoutClick = {
-
-                            AppKit.disconnect(
-                                onSuccess = {
-                                    Log.d("@@", "Logout SuccessFull")
-
-
-                                },
-                                onError = {
-                                    Log.d("@@", "Logout Failed")
-                                }
-                            )
-                            authViewmodel.onLogout()
-
-                        },
                         search = onSearchClick,
                         contentPaddingValues = paddingValues,
                         dashboardViewmodel = dashboardViewmodel
@@ -183,10 +168,20 @@ fun VaultlyApp(
             composable(route = VaultlyRoutes.PROFILESCREEN.name) {
                 ProfileScreen(
                     vaultlyThemeViewmodel = vaultlyThemeViewmodel,
-                    walletAddress = WALLET_ADDRESS,
+                    walletAddress = AppKit.getAccount()?.address ?: "",
                     userName = "",
                     onThemeClick = {},
                     onLogoutClick = {
+                        AppKit.disconnect(
+                            onSuccess = {
+                                Log.d("@@", "Logout SuccessFull")
+
+
+                            },
+                            onError = {
+                                Log.d("@@", "Logout Failed")
+                            }
+                        )
                         authViewmodel.onLogout()
                     },
                     contentPaddingValues = paddingValues

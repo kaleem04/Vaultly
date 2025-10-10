@@ -12,6 +12,7 @@ import com.dapp.vaultly.data.repository.PolygonRepository
 import com.dapp.vaultly.data.repository.UserVaultRepository
 import com.dapp.vaultly.util.Constants.CONTRACT_ADDRESS
 import com.dapp.vaultly.util.Constants.WALLET_ADDRESS
+import com.reown.appkit.client.AppKit
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,7 +32,7 @@ class DashboardViewmodel @Inject constructor(
     private val _addPasswordUiState = MutableStateFlow<UiState<Unit>>(UiState.Idle)
     val addPasswordUiState: StateFlow<UiState<Unit>> = _addPasswordUiState.asStateFlow()
 
-    var currentCid by mutableStateOf(vaultRepo.currentCid)
+
 
 
     private val _blockchainState = MutableStateFlow<UiState<String>>(UiState.Idle)
@@ -41,12 +42,12 @@ class DashboardViewmodel @Inject constructor(
     val addCidToPolygonState: StateFlow<UiState<String>> = _addCidToPolygonState.asStateFlow()
 
     init {
-        val userId = WALLET_ADDRESS
-        // 1. Load from Room (offline-first)
-        loadCredentials(userId)
-        // 2. Refresh from Polygon + Pinata (network sync)
-        refreshFromBlockchain(userId)
-        Log.d("DashboardVM", "current cid :$currentCid")
+       val userId = WALLET_ADDRESS
+//        // 1. Load from Room (offline-first)
+       loadCredentials(userId)
+////        // 2. Refresh from Polygon + Pinata (network sync)
+      refreshFromBlockchain(userId)
+////        Log.d("DashboardVM", "current cid :$currentCid")
     }
 
     /** Load from Room only */
@@ -63,6 +64,9 @@ class DashboardViewmodel @Inject constructor(
         }
     }
 
+    fun resetAddPasswordState() {
+        _addPasswordUiState.value = UiState.Idle
+    }
 
     /** Force sync: Polygon → Pinata → DB */
     fun refreshFromBlockchain(userId: String) {
@@ -96,26 +100,26 @@ class DashboardViewmodel @Inject constructor(
         viewModelScope.launch {
             _addPasswordUiState.value = UiState.Loading
             try {
-                val cid = vaultRepo.addOrUpdateCredential(userId, credential)
+                val (cid, pinnedContent) = vaultRepo.addOrUpdateCredential(userId, credential)
 
                 _addPasswordUiState.value = UiState.Success(Unit)
 
                 if (cid.isNotEmpty()) {
                     // 2. Fetch content from Pinata
-                    val content = vaultRepo.getContentFromPinata(cid)
-                    Log.d("@@", "$content")
+//                    val content = vaultRepo.getContentFromPinata(cid)
+//                    Log.d("@@", "$content")
                     // 3. Store into Room (UI updates automatically from DB observer)
-                    if (content.isNotEmpty()) {
-                        vaultRepo.saveContentInDb(userId, cid, content)
+                    if (pinnedContent.isNotEmpty()) {
+                        vaultRepo.saveContentInDb(userId, cid, pinnedContent)
                         Log.d("DashboardVM", "Content saved in DB successfully")
                     }
                 }
                 loadCredentials(userId)
-                _addPasswordUiState.value = UiState.Idle
             } catch (e: Exception) {
                 _addPasswordUiState.value = UiState.Error(e.message ?: "Failed To Add Credentials")
                 Log.e("DashboardVM", "Error adding/updating credential", e)
             }
+            resetAddPasswordState()
         }
     }
 
@@ -132,14 +136,17 @@ class DashboardViewmodel @Inject constructor(
         }
     }
 
-    fun addCidToPolygon(cid: String) {
+    fun addCidToPolygon() {
         viewModelScope.launch {
             _addCidToPolygonState.value = UiState.Loading
+            val currentCid = vaultRepo.getCid()
+            Log.d("DashboardVM", "current cid :$currentCid")
             try {
-                val txHash = vaultRepo.saveCid(account = WALLET_ADDRESS, CONTRACT_ADDRESS, cid)
+                val txHash =
+                    vaultRepo.saveCid(account = AppKit.getAccount()?.address ?: "", CONTRACT_ADDRESS, currentCid)
                 if (txHash.isNotEmpty()) {
                     _addCidToPolygonState.value = UiState.Success(txHash)
-                    refreshFromBlockchain(WALLET_ADDRESS)
+                  //  refreshFromBlockchain(WALLET_ADDRESS)
                     Log.d("DashboardVM", "Cid Added to Blockchain Successfully $txHash")
                 } else {
                     _addCidToPolygonState.value = UiState.Error("Failed To Add Cid To Blockchain")
