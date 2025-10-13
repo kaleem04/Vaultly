@@ -11,7 +11,7 @@ import javax.inject.Qualifier
 object Constants {
     const val PINATA_URL = "https://api.pinata.cloud/"
     const val POLYGON_URL = "https://api.etherscan.io/v2/"
-    const val IPFS_URL = "https://gateway.pinata.cloud/"
+    const val IPFS_URL = "https://fuchsia-obliged-porcupine-603.mypinata.cloud/"
     const val CONTRACT_ADDRESS = "0x65CEA2972EDbF230E6E526eE86e17b63274aE368"
     const val TEST_SIGNATURE = "vaultly-dev-fallback"
     const val JWT_TOKEN =

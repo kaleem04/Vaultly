@@ -130,7 +130,7 @@ object VaultlyModule {
 
         val authInterceptor = Interceptor { chain ->
             val request = chain.request().newBuilder()
-                .addHeader("Authorization", "Bearer ${Constants.JWT_TOKEN}")
+          //      .addHeader("Authorization", "Bearer ${Constants.JWT_TOKEN}")
                 .build()
             chain.proceed(request)
         }
