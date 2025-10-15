@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface UserVaultDao {
@@ -11,7 +12,7 @@ interface UserVaultDao {
     suspend fun insertOrUpdate(vault: UserVaultEntity)
 
     @Query("SELECT * FROM user_vaults WHERE userId = :userId ORDER BY updatedAt ASC")
-    suspend fun getVault(userId: String): UserVaultEntity?
+    fun getVault(userId: String): Flow<UserVaultEntity?>
 
     @Query("SELECT cid FROM user_vaults WHERE userId = :userId")
     suspend fun getCid(userId: String) : String

@@ -2,6 +2,7 @@ package com.dapp.vaultly.ui.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -19,18 +20,22 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,12 +44,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dapp.vaultly.VaultDockedSearchBar
 import com.dapp.vaultly.data.model.Credential
-import com.dapp.vaultly.data.model.UiState
 import com.dapp.vaultly.ui.viewmodels.AddPasswordViewmodel
 import com.dapp.vaultly.ui.viewmodels.DashboardViewmodel
-import com.dapp.vaultly.util.Constants
 import com.reown.appkit.client.AppKit
-
+import kotlinx.coroutines.launch
 
 @Composable
 fun DashboardScreen(
@@ -52,111 +55,114 @@ fun DashboardScreen(
     addPasswordViewmodel: AddPasswordViewmodel,
     search: Boolean = false,
     contentPaddingValues: PaddingValues = PaddingValues(0.dp),
+    snackbarHostState: SnackbarHostState, // Accept SnackbarHostState from the root composable
     modifier: Modifier = Modifier,
 ) {
+    // 1. COLLECT THE SINGLE, CONSOLIDATED STATE
+    val uiState by dashboardViewmodel.uiState.collectAsStateWithLifecycle()
+
+    // UI-specific state remains here
     var query by remember { mutableStateOf("") }
-    val uiState by dashboardViewmodel.credentials.collectAsStateWithLifecycle()
-    val blockchainStatus by dashboardViewmodel.blockchain.collectAsStateWithLifecycle()
-    val addCidToPolygonState by dashboardViewmodel.addCidToPolygonState.collectAsStateWithLifecycle()
-    val buttonState = when (addCidToPolygonState) {
-        is UiState.Idle -> ButtonState.Idle
-        is UiState.Loading -> ButtonState.Loading
-        is UiState.Success -> ButtonState.Success
-        is UiState.Error -> ButtonState.Failed("Failed To Add")
+    val scope = rememberCoroutineScope()
+
+    // 2. TRIGGER INITIAL DATA LOAD (runs only once)
+    LaunchedEffect(Unit) {
+        dashboardViewmodel.onScreenReady()
     }
+
+    // 3. SHOW SNACKBAR MESSAGES (runs only when uiState.userMessage changes)
+    LaunchedEffect(uiState.userMessage) {
+        uiState.userMessage?.let { message ->
+            scope.launch {
+                snackbarHostState.showSnackbar(message)
+                // Notify the ViewModel that the message has been shown
+                dashboardViewmodel.userMessageShown()
+            }
+        }
+    }
+
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .padding(contentPaddingValues)
-
     ) {
         if (search) {
             VaultDockedSearchBar(
                 query = query,
                 onQueryChange = { query = it },
-                onSearch = { /* filter Vault items */ }
+                onSearch = { /* TODO: Implement search filtering */ }
             )
         }
-        // 🔹 Categories
+
         LazyRow(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(listOf("Passwords", "Notes", "Cards", "IDs")) { category ->
-                FilterChip(category, onClick = { /* filter */ })
+                FilterChip(category, onClick = { /* TODO: Implement category filtering */ })
             }
         }
 
-        when (uiState) {
-            is UiState.Idle -> {
-                EmptyVaultScreen()
-            }
+        // 4. MAIN CONTENT AREA: A Box allows layering content (list, empty screen, loader)
+        Box(modifier = Modifier.weight(1f)) {
 
-            is UiState.Loading -> {
-                CircularProgressIndicator()
-            }
-
-            is UiState.Success -> {
-                val credentials = (uiState as UiState.Success<List<Credential>>).data
+            // The credential list is always present if the list is not empty
+            if (uiState.credentials.isNotEmpty()) {
                 LazyColumn(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    items(credentials) { item ->
+                    items(uiState.credentials, key = { it.website }) { credential ->
                         VaultCard(
-                            item,
+                            credential = credential,
                             onClick = {
-
-                                addPasswordViewmodel.selectCredential(item.id)
-                                addPasswordViewmodel.openSheet = true
-                                addPasswordViewmodel.editingCredential = item
+                                addPasswordViewmodel.selectCredential(credential)
                             },
                             onDeleteClick = {
-                                dashboardViewmodel.deleteCredential(
-                                    AppKit.getAccount()?.address ?: "",
-                                    item.website
-                                )
+                                val userId = AppKit.getAccount()?.address
+                                if (userId != null) {
+                                    dashboardViewmodel.deleteCredential(userId, credential.website)
+                                }
                             }
-                        )
-                    }
-                    item {
-                        when (blockchainStatus) {
-                            is UiState.Idle -> {}
-                            is UiState.Loading -> {
-                                //   CircularProgressIndicator()
-                            }
-
-                            is UiState.Success -> {
-                                val blockchainStatus =
-                                    (blockchainStatus as UiState.Success<String>).data
-
-                                Text(text = blockchainStatus)
-                            }
-
-                            is UiState.Error -> {
-                                val error = (blockchainStatus as UiState.Error).message
-                                Text(text = error)
-                            }
-                        }
-
-                    }
-                    item {
-                        CustomButton(
-                            state = buttonState,
-                            onClick = {
-                                dashboardViewmodel.addCidToPolygon()
-                            },
-                            idleText = "Sync to Blockchain"
                         )
                     }
                 }
-
             }
 
-            is UiState.Error -> {}
+            // Show empty screen only when not loading and the list is truly empty
+            if (!uiState.isLoading && uiState.credentials.isEmpty()) {
+                EmptyVaultScreen()
+            }
 
-
+            // Show a full-screen loader when performing a blocking action
+            if (uiState.isLoading) {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            }
         }
-        // 🔹 Vault items (grid like LastPass)
+
+        // 5. FOOTER: The "Sync to Blockchain" button at the bottom
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Button(
+                onClick = { dashboardViewmodel.addCidToPolygon() },
+                // Disable the button during a sync operation to prevent multiple clicks
+                enabled = !uiState.isSyncing
+            ) {
+                if (uiState.isSyncing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(ButtonDefaults.IconSize),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                }
+                Text("Sync to Blockchain")
+            }
+        }
     }
 }
 
@@ -194,34 +200,30 @@ fun VaultCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(8.dp)
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically // Center items vertically in the row
         ) {
             Column(
                 verticalArrangement = Arrangement.spacedBy(5.dp),
-                modifier = Modifier.weight(0.8f)
+                modifier = Modifier.weight(1f) // Give column all available space
             ) {
                 Text(credential.website, style = MaterialTheme.typography.titleMedium)
                 Text(
                     text = credential.username,
                     style = MaterialTheme.typography.bodySmall,
                 )
-                Text(
-                    text = Constants.formatDate(credential.updatedAt),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-
+                // Removed the hardcoded date, assuming it's not in the model yet
+                // To re-add it, make sure `updatedAt` is part of your Credential model
             }
 
             IconButton(
-                onClick = onDeleteClick,
-                modifier = Modifier.weight(0.2f)
+                onClick = onDeleteClick
             ) {
                 Icon(
                     Icons.Default.Delete,
-                    contentDescription = null
+                    contentDescription = "Delete ${credential.website}" // Improved accessibility
                 )
             }
-
         }
     }
 }
@@ -238,30 +240,24 @@ fun EmptyVaultScreen(
         verticalArrangement = Arrangement.Center
     ) {
         Icon(
-            imageVector = Icons.Filled.AddCircle, // Or Icons.Filled.Add if you prefer a simpler one
-            contentDescription = "Add new password", // For accessibility
-            modifier = Modifier.size(128.dp), // Make the icon large and inviting
+            imageVector = Icons.Filled.AddCircle,
+            contentDescription = "Empty Vault",
+            modifier = Modifier.size(128.dp),
             tint = MaterialTheme.colorScheme.primary
         )
-
         Spacer(modifier = Modifier.height(24.dp))
-
         Text(
             text = "Your Vault is Empty",
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onSurface
         )
-
         Spacer(modifier = Modifier.height(16.dp))
-
         Text(
-            text = "Tap the '+' button in The Top to add your first password and keep it secure.",
+            text = "Add your first password to keep it secure.",
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 32.dp) // Give text some breathing room
+            modifier = Modifier.padding(horizontal = 32.dp)
         )
-
-        Spacer(modifier = Modifier.height(32.dp)) // More space before
     }
 }

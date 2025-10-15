@@ -20,11 +20,15 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SearchBarDefaults
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,7 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -46,12 +50,12 @@ import com.dapp.vaultly.data.model.WalletUiState
 import com.dapp.vaultly.ui.screens.AddPasswordBottomSheetContent
 import com.dapp.vaultly.ui.screens.DashboardScreen
 import com.dapp.vaultly.ui.screens.ProfileScreen
+import com.dapp.vaultly.ui.screens.SplashScreen
 import com.dapp.vaultly.ui.screens.WelcomeScreen
 import com.dapp.vaultly.ui.viewmodels.AddPasswordViewmodel
 import com.dapp.vaultly.ui.viewmodels.AuthViewmodel
 import com.dapp.vaultly.ui.viewmodels.DashboardViewmodel
 import com.dapp.vaultly.ui.viewmodels.VaultlyThemeViewmodel
-import com.dapp.vaultly.util.Constants.WALLET_ADDRESS
 import com.google.accompanist.navigation.material.ExperimentalMaterialNavigationApi
 import com.reown.appkit.client.AppKit
 import com.reown.appkit.client.models.request.Request
@@ -62,44 +66,82 @@ import org.json.JSONArray
 
 val noBottomNavRoutes = listOf(
     VaultlyRoutes.WELCOMESCREEN.name,
-    VaultlyRoutes.VAULTLYBOTTOMSHEET.name
+    VaultlyRoutes.VAULTLYBOTTOMSHEET.name,
+    VaultlyRoutes.SPLASHSCREEN.name
 )
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialNavigationApi::class)
-
 @Composable
 fun VaultlyApp(
     authViewmodel: AuthViewmodel,
     vaultlyThemeViewmodel: VaultlyThemeViewmodel
 ) {
-
     val addPasswordViewmodel: AddPasswordViewmodel = hiltViewModel()
     val coroutineScope = rememberCoroutineScope()
-    val modalSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    // Pass `skipPartiallyExpanded = true` to prevent it getting stuck in a middle state.
+    val modalSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val navController = rememberNavController()
-    val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
     val dashboardViewmodel: DashboardViewmodel = hiltViewModel()
     var onSearchClick by rememberSaveable { mutableStateOf(false) }
-    var showSheet by rememberSaveable { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
     val authState by authViewmodel.uiState.collectAsStateWithLifecycle()
+    // Read the state from the ViewModel. This will trigger recomposition when it changes.
+    val openAddPasswordSheet = addPasswordViewmodel.openSheet
+    val shouldShowBars by remember(currentRoute) {
+        derivedStateOf {
+            noBottomNavRoutes.none { route ->
+                currentRoute?.startsWith(route) == true
+            }
+        }
+    }
+    // *** FIX 2: Add the navigation logic to move away from the splash screen ***
+    LaunchedEffect(authState) {
+        // When the ViewModel determines the auth state, navigate accordingly.
+        when (authState) {
+            WalletUiState.Welcome -> {
+                navController.navigate(VaultlyRoutes.WELCOMESCREEN.name) {
+                    // Clear the splash screen from the back stack
+                    popUpTo(VaultlyRoutes.SPLASHSCREEN.name) { inclusive = true }
+                }
+            }
+            is WalletUiState.DashboardReady, is WalletUiState.DashboardPendingSignature -> {
+                navController.navigate(VaultlyRoutes.DASHBOARDSCREEN.name) {
+                    // Clear the splash screen from the back stack
+                    popUpTo(VaultlyRoutes.SPLASHSCREEN.name) { inclusive = true }
+                }
+            }
+            // Do nothing while it's Idle (still loading), keeping the user on the splash screen
+            WalletUiState.Idle -> {}
+            WalletUiState.Loading -> {}
+        }
+    }
 
-    val shouldShowBars = noBottomNavRoutes.none { route ->
-        currentRoute?.startsWith(route) == true
+
+    // This is the unified and simplified dismissal logic.
+    val dismissSheet: () -> Unit = {
+        coroutineScope.launch {
+            modalSheetState.hide()
+        }.invokeOnCompletion {
+            // Important: Only update the ViewModel's state AFTER the sheet is no longer visible.
+            if (!modalSheetState.isVisible) {
+                // Assuming you have this function in your ViewModel
+                // to set openSheet = false
+                addPasswordViewmodel.onSheetDismiss()
+            }
+        }
     }
 
     Scaffold(
         topBar = {
             if (shouldShowBars) {
                 VaultlyTopAppBar(
-                    onSearchClick = {
-                        onSearchClick = !onSearchClick
-                    },
-                    onAddClick = {
-                        addPasswordViewmodel.editingCredential = null
-                        addPasswordViewmodel.openSheet = true
-                    },
+                    onSearchClick = { onSearchClick = !onSearchClick },
+                    // Assuming you have this function in your ViewModel
+                    // to set openSheet = true
+                    onAddClick = { addPasswordViewmodel.prepareForNewCredential() },
                     isSearchActive = onSearchClick
-
                 )
             }
         },
@@ -107,64 +149,50 @@ fun VaultlyApp(
             if (shouldShowBars) {
                 VaultlyBottomAppBar(
                     selectedItem = currentRoute ?: "",
-                    onHomeClick = {
-                        navController.navigate(VaultlyRoutes.DASHBOARDSCREEN.name)
-                    },
-                    onProfileClick = {
-                        navController.navigate(VaultlyRoutes.PROFILESCREEN.name)
-                    }
+                    onHomeClick = { navController.navigate(VaultlyRoutes.DASHBOARDSCREEN.name) },
+                    onProfileClick = { navController.navigate(VaultlyRoutes.PROFILESCREEN.name) }
                 )
             }
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
-        // Collect events from AppEventBus
+        val startDestination = when (authState) {
+            is WalletUiState.DashboardReady, is WalletUiState.DashboardPendingSignature -> VaultlyRoutes.DASHBOARDSCREEN.name
+            else -> VaultlyRoutes.WELCOMESCREEN.name
+        }
 
         NavHost(
             navController = navController,
-            startDestination = when (authState) {
-                WalletUiState.Idle -> VaultlyRoutes.WELCOMESCREEN.name
-                WalletUiState.Welcome -> VaultlyRoutes.WELCOMESCREEN.name
-                WalletUiState.DashboardReady -> VaultlyRoutes.DASHBOARDSCREEN.name
-                is WalletUiState.DashboardPendingSignature -> VaultlyRoutes.DASHBOARDSCREEN.name
-                else -> VaultlyRoutes.WELCOMESCREEN.name
-            }
-
+            startDestination = VaultlyRoutes.SPLASHSCREEN.name
         ) {
             composable(VaultlyRoutes.WELCOMESCREEN.name) {
                 WelcomeScreen {
                     navController.navigate(VaultlyRoutes.VAULTLYBOTTOMSHEET.name)
                 }
             }
-            composable(VaultlyRoutes.VAULTLYBOTTOMSHEET.name) {
-                VaultlyBottomSheet(
-                    onDismiss = {
-                        navController.popBackStack()
-                    },
 
-                    )
+            composable(VaultlyRoutes.SPLASHSCREEN.name) {
+                SplashScreen()
+            }
+            composable(VaultlyRoutes.VAULTLYBOTTOMSHEET.name) {
+                VaultlyBottomSheet(onDismiss = { navController.popBackStack() })
             }
             composable(VaultlyRoutes.DASHBOARDSCREEN.name) {
                 if (authState is WalletUiState.DashboardPendingSignature) {
-
                     SignatureDialog(
                         address = AppKit.getAccount()?.address ?: "",
-                        onConfirm = {
-                            requestPersonalSign(AppKit.getAccount()?.address ?: "")
-                        }
+                        onConfirm = { requestPersonalSign(AppKit.getAccount()?.address ?: "") }
                     )
-//                    dashboardViewmodel.refreshFromBlockchain(
-//                        userId = AppKit.getAccount()?.address ?: "",
-//                    )
                 } else {
                     DashboardScreen(
                         addPasswordViewmodel = addPasswordViewmodel,
                         search = onSearchClick,
                         contentPaddingValues = paddingValues,
-                        dashboardViewmodel = dashboardViewmodel
+                        dashboardViewmodel = dashboardViewmodel,
+                        snackbarHostState = snackbarHostState
                     )
                 }
             }
-
             composable(route = VaultlyRoutes.PROFILESCREEN.name) {
                 ProfileScreen(
                     vaultlyThemeViewmodel = vaultlyThemeViewmodel,
@@ -173,14 +201,8 @@ fun VaultlyApp(
                     onThemeClick = {},
                     onLogoutClick = {
                         AppKit.disconnect(
-                            onSuccess = {
-                                Log.d("@@", "Logout SuccessFull")
-
-
-                            },
-                            onError = {
-                                Log.d("@@", "Logout Failed")
-                            }
+                            onSuccess = { Log.d("@@", "Logout SuccessFull") },
+                            onError = { Log.d("@@", "Logout Failed") }
                         )
                         authViewmodel.onLogout()
                     },
@@ -188,36 +210,22 @@ fun VaultlyApp(
                 )
             }
         }
+    }
 
-        if (addPasswordViewmodel.openSheet) {
-            ModalBottomSheet(
-                sheetState = modalSheetState,
-                onDismissRequest = {
-                    coroutineScope.launch {
-                        modalSheetState.hide()
-                    }.invokeOnCompletion {
-                        addPasswordViewmodel.openSheet = false
-                    }
-                },
-            ) {
-                AddPasswordBottomSheetContent(
-                    credential = addPasswordViewmodel.editingCredential,
-                    onDismiss = {
-
-                        coroutineScope.launch {
-                            modalSheetState.hide()
-                        }.invokeOnCompletion {
-                            addPasswordViewmodel.openSheet = false
-                        }
-
-                    },
-                    dashboardViewmodel = dashboardViewmodel,
-                    viewModel = addPasswordViewmodel
-                )
-            }
+    // *** THE MAIN FIX IS HERE ***
+    // We display the ModalBottomSheet conditionally.
+    // Compose handles showing/hiding it correctly based on whether it's in the composition.
+    if (openAddPasswordSheet) {
+        ModalBottomSheet(
+            onDismissRequest = dismissSheet, // This is called when swiping down or pressing back.
+            sheetState = modalSheetState
+        ) {
+            AddPasswordBottomSheetContent(
+                onDismiss = dismissSheet, // This is for your internal buttons (e.g., "Save").
+                dashboardViewmodel = dashboardViewmodel,
+                viewModel = addPasswordViewmodel
+            )
         }
-
-
     }
 }
 
@@ -233,14 +241,10 @@ fun VaultlyBottomSheet(
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         modifier = modifier
     ) {
-        AppKitComponent(
-            true,
-
-            ) {
+        AppKitComponent(true) {
             onDismiss()
         }
     }
-
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -251,7 +255,7 @@ fun VaultDockedSearchBar(
     onSearch: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var active by remember { mutableStateOf(false) }
+    var active by rememberSaveable { mutableStateOf(false) }
     val colors = SearchBarDefaults.colors()
 
     DockedSearchBar(
@@ -289,12 +293,10 @@ fun VaultDockedSearchBar(
         modifier = modifier
             .fillMaxWidth()
             .padding(16.dp),
-        //   shape = SearchBarDefaults.inputFieldShape,
         colors = colors,
         tonalElevation = SearchBarDefaults.TonalElevation,
         shadowElevation = SearchBarDefaults.ShadowElevation,
     ) {
-        // Optional: dropdown suggestions
         Text(
             "Recent searches will go here",
             fontSize = 10.sp,
@@ -328,7 +330,6 @@ fun VaultlyTopAppBar(
             IconButton(onClick = onAddClick) {
                 Icon(Icons.Default.Add, contentDescription = "Add Password")
             }
-
         }
     )
 }
@@ -385,7 +386,6 @@ fun SignatureDialog(
 }
 
 fun requestPersonalSign(account: String?, message: String = "Vaultly unlock request") {
-
     val params = JSONArray()
         .put(message)   // data to sign
         .put(account)   // wallet address

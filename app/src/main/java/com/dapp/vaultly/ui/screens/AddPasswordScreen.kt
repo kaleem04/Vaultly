@@ -5,8 +5,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -22,42 +26,38 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dapp.vaultly.data.model.Credential
-import com.dapp.vaultly.data.model.UiState
 import com.dapp.vaultly.ui.viewmodels.AddPasswordViewmodel
 import com.dapp.vaultly.ui.viewmodels.DashboardViewmodel
 import com.reown.appkit.client.AppKit
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddPasswordBottomSheetContent(
-    credential: Credential? = null,
     onDismiss: () -> Unit,
     viewModel: AddPasswordViewmodel,
     dashboardViewmodel: DashboardViewmodel
 ) {
-    val selectedId by viewModel.selectedCredentialId.collectAsStateWithLifecycle()
-    //val credential by dashboardViewmodel.getCredentialById(selectedId ?: 0)
-       // .collectAsStateWithLifecycle()
-    LaunchedEffect(selectedId) {
-        if (selectedId != null) {
+    // 1. Get the UI state from the correct ViewModel (AddPasswordViewmodel).
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-            viewModel.loadCredential(credential ?: Credential(website = "", username = "", password = "", note = "")) // prefill fields
+    // We get the overall dashboard state to know if an operation is in progress.
+    val dashboardState by dashboardViewmodel.uiState.collectAsStateWithLifecycle()
+
+    val editingCredential = viewModel.editingCredential
+    val isEditMode = editingCredential != null
+
+    // 2. A LaunchedEffect to pre-fill the fields when in edit mode.
+    // This runs only when the bottom sheet is first shown for editing.
+    LaunchedEffect(editingCredential) {
+        if (editingCredential != null) {
+            viewModel.loadCredentialForEditing(editingCredential)
         } else {
             viewModel.clearFields()
         }
     }
-    val isEditMode = credential != null
-    val uiState = viewModel.uiState.value
-    val addPasswordUiState by dashboardViewmodel.addPasswordUiState.collectAsStateWithLifecycle()
-    val buttonState = when (addPasswordUiState) {
-        is UiState.Idle -> ButtonState.Idle
-        is UiState.Loading -> ButtonState.Loading
-        is UiState.Success -> ButtonState.Success
-        is UiState.Error -> ButtonState.Failed("Failed To Add")
-    }
+
     Column(
         modifier = Modifier
             .padding(20.dp)
@@ -71,8 +71,9 @@ fun AddPasswordBottomSheetContent(
 
         Spacer(Modifier.height(16.dp))
 
+        // TextFields now get their value directly from the AddPasswordViewmodel's state.
         OutlinedTextField(
-            value = uiState.website.ifEmpty { credential?.website ?: "" },
+            value = uiState.website,
             onValueChange = viewModel::onWebsiteChange,
             label = { Text("Website / App") },
             singleLine = true,
@@ -82,7 +83,7 @@ fun AddPasswordBottomSheetContent(
         Spacer(Modifier.height(12.dp))
 
         OutlinedTextField(
-            value = uiState.username.ifEmpty { credential?.username ?: "" },
+            value = uiState.username,
             onValueChange = viewModel::onUsernameChange,
             label = { Text("Username / Email") },
             singleLine = true,
@@ -92,23 +93,22 @@ fun AddPasswordBottomSheetContent(
         Spacer(Modifier.height(12.dp))
 
         OutlinedTextField(
-            value = uiState.password.ifEmpty { credential?.password ?: "" },
+            value = uiState.password,
             onValueChange = viewModel::onPasswordChange,
             label = { Text("Password") },
             singleLine = true,
             visualTransformation = if (uiState.showPassword) VisualTransformation.None else PasswordVisualTransformation(),
             trailingIcon = {
-                IconButton(onClick = { viewModel.togglePasswordVisibility() }) {
-                    Icon(
-                        imageVector = if (uiState.showPassword) Icons.Default.Lock else Icons.Default.Lock,
-                        contentDescription = null
-                    )
+                IconButton(onClick = viewModel::togglePasswordVisibility) {
+                    val icon = if (uiState.showPassword) Icons.Default.Lock else Icons.Default.Lock
+                    Icon(imageVector = icon, contentDescription = "Toggle password visibility")
                 }
             },
             modifier = Modifier.fillMaxWidth()
         )
+
         OutlinedTextField(
-            value = uiState.note.ifEmpty { credential?.note ?: "" },
+            value = uiState.note,
             onValueChange = viewModel::onNoteChange,
             label = { Text("Note") },
             placeholder = { Text("Optional Note") },
@@ -117,43 +117,56 @@ fun AddPasswordBottomSheetContent(
         )
 
         Spacer(Modifier.height(20.dp))
-        val walletAddress = AppKit.getAccount()?.address ?: "";
-        val credential = Credential(
-            website = uiState.website,
-            username = uiState.username,
-            password = uiState.password,
-            note = uiState.note
-        )
-        CustomButton(
-            state = buttonState,
+
+        // 3. Simplified Save/Update button.
+        Button(
+            // Use the isLoading flag from the DashboardViewModel to show a loading state.
+            enabled = !dashboardState.isLoading,
             onClick = {
+                // Construct the credential object right here before sending.
+                val newOrUpdatedCredential = Credential(
+                    id = editingCredential?.id ?: 0, // Keep original ID for updates
+                    website = uiState.website,
+                    username = uiState.username,
+                    password = uiState.password,
+                    note = uiState.note
+                )
+
                 if (viewModel.credentialsValidation()) {
-                    dashboardViewmodel.addOrUpdateCredential(
-                        userId = walletAddress,
-                        credential = credential
-                    )
-                    viewModel.clearFields()
-
+                    val userId = AppKit.getAccount()?.address
+                    if (userId != null) {
+                        dashboardViewmodel.addOrUpdateCredential(
+                            userId = userId,
+                            credential = newOrUpdatedCredential
+                        )
+                    }
+                    // The success of the operation will be handled by the DashboardScreen.
+                    // We can just close the sheet.
+                    onDismiss()
                 }
-
             },
-            idleText = if (isEditMode) "Update" else "Save",
             modifier = Modifier.fillMaxWidth()
-        )
+        ) {
+            if (dashboardState.isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(ButtonDefaults.IconSize),
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Text(if (isEditMode) "Update" else "Save")
+            }
+        }
 
         Spacer(Modifier.height(8.dp))
 
         OutlinedButton(
             onClick = {
-                viewModel.clearFields()
-                onDismiss()
+                onDismiss() // Simply dismiss the sheet.
             },
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Cancel")
         }
-
-
     }
 }
-

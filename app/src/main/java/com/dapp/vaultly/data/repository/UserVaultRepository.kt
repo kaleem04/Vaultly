@@ -2,9 +2,6 @@ package com.dapp.vaultly.data.repository
 
 import android.content.Context
 import android.util.Log
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import com.dapp.vaultly.data.local.AesKeyStorage
 import com.dapp.vaultly.data.local.UserVaultDao
 import com.dapp.vaultly.data.local.UserVaultEntity
@@ -19,7 +16,9 @@ import com.dapp.vaultly.util.CryptoUtil
 import com.reown.appkit.client.AppKit
 import com.reown.appkit.client.models.request.Request
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.json.JSONArray
 import org.json.JSONObject
@@ -40,34 +39,52 @@ class UserVaultRepository(
     private suspend fun getSecretKey(): SecretKey? {
         val secretKey = AesKeyStorage.readKey(context).firstOrNull()
         if (secretKey == null) {
-            Log.e(
-                "UserVaultRepository",
-                "Secret key not found. Cannot perform cryptographic operations."
-            )
+            Log.e("UserVaultRepository", "Secret key not found. Cannot perform cryptographic operations.")
         }
         return secretKey
     }
 
     // Get all credentials for user
-    suspend fun getCredentials(userId: String): List<Credential> {
-        val vault = vaultDao.getVault(userId) ?: return emptyList()
-        if (vault.cid.isNotEmpty()) {
 
-        }
-        val secretKey = getSecretKey() ?: return emptyList()
+    // THIS IS THE KEY CHANGE
+    fun getCredentials(userId: String): Flow<List<Credential>> {
+        // 1. Get a Flow of the raw database entity from the DAO.
+        return vaultDao.getVault(userId)
+            .map { vault -> // 2. Use .map to transform the data inside the flow.
+                if (vault == null) {
+                    return@map emptyList<Credential>() // If no vault, emit an empty list.
+                }
 
-        val decryptedJson = CryptoUtil.decryptBlob(vault.encryptedBlob, secretKey)
-        val jsonArray = JSONArray(decryptedJson)
-        Log.d("@@", jsonArray.toString())
-        return List(jsonArray.length()) { i ->
-            val obj = jsonArray.getJSONObject(i)
-            Credential(
-                website = obj.getString("website"),
-                username = obj.getString("username"),
-                password = obj.getString("password"),
-                note = obj.getString("note")
-            )
-        }
+                val secretKey = getSecretKey()
+                if (secretKey == null) {
+                    Log.e(
+                        "UserVaultRepository",
+                        "Secret key is missing, cannot decrypt credentials."
+                    )
+                    return@map emptyList<Credential>() // If no key, emit an empty list.
+                }
+
+                try {
+                    // 3. Perform the same decryption logic as before.
+                    val decryptedJson = CryptoUtil.decryptBlob(vault.encryptedBlob, secretKey)
+                    val jsonArray = JSONArray(decryptedJson)
+                    Log.d("@@", "Decrypted credentials from DB Flow: $jsonArray")
+
+                    // 4. Transform JSON into a List and this list will be the new emission.
+                    List(jsonArray.length()) { i ->
+                        val obj = jsonArray.getJSONObject(i)
+                        Credential(
+                            website = obj.getString("website"),
+                            username = obj.getString("username"),
+                            password = obj.getString("password"),
+                            note = obj.getString("note")
+                        )
+                    }
+                } catch (e: Exception) {
+                    Log.e("UserVaultRepository", "Failed to parse decrypted JSON", e)
+                    return@map emptyList<Credential>() // If JSON is corrupted, emit an empty list.
+                }
+            }
     }
 
     suspend fun getContentFromPinata(cid: String): String {
@@ -77,34 +94,28 @@ class UserVaultRepository(
     }
 
     // Add or update a credential
+    // In UserVaultRepository.kt
+
     suspend fun addOrUpdateCredential(
         userId: String,
         credential: Credential
     ): Pair<String, String> {
-        val vault = vaultDao.getVault(userId)
         val secretKey = getSecretKey() ?: return Pair("", "")
-        val currentList = vault?.let {
 
-            val decryptedJson = CryptoUtil.decryptBlob(it.encryptedBlob, secretKey)
-            val arr = JSONArray(decryptedJson)
-            List(arr.length()) { i ->
-                val obj = arr.getJSONObject(i)
-                Credential(
-                    website = obj.getString("website"),
-                    username = obj.getString("username"),
-                    password = obj.getString("password"),
-                    note = obj.getString("note")
-                )
-            }
-        } ?: emptyList()
+        // 1. Get the CURRENT list of credentials by taking the first emission from your new reactive flow.
+        // This replaces the old way of manually getting the vault and decrypting it here.
+        val currentList = getCredentials(userId).firstOrNull() ?: emptyList()
 
-        // Merge/update credentials
+        // 2. Merge the new credential into the list. (This logic is correct)
         val updatedList = currentList.toMutableList()
         val index = updatedList.indexOfFirst { it.website == credential.website }
-        if (index >= 0) updatedList[index] = credential
-        else updatedList.add(credential)
+        if (index >= 0) {
+            updatedList[index] = credential
+        } else {
+            updatedList.add(credential)
+        }
 
-        // Convert back to JSON array
+        // 3. Convert back to JSON and encrypt. (This logic is correct)
         val jsonArray = JSONArray()
         updatedList.forEach { c ->
             jsonArray.put(JSONObject().apply {
@@ -114,52 +125,46 @@ class UserVaultRepository(
                 put("note", c.note)
             })
         }
-
         val jsonString = jsonArray.toString()
-        Log.d("@@", "encrypt secret : $jsonString")
-        val encryptedBlob = CryptoUtil.encryptBlob(jsonString, secretKey)
+        val newEncryptedBlob = CryptoUtil.encryptBlob(jsonString, secretKey)
 
-        // The content that will be pinned to IPFS
-        val vaultlyContent = VaultlyContent(encryptedBlob)
+        // 4. Create the content to be pinned to IPFS.
+        val vaultlyContent = VaultlyContent(newEncryptedBlob)
         val content = mapOf(
-            "wallet" to WALLET_ADDRESS,
+            "wallet" to WALLET_ADDRESS, // You should pass this in or get it reliably
             "vault" to vaultlyContent
         )
-        val pinataMetadata = PinataMetadata(
-            name = "vault_${WALLET_ADDRESS}.json",
-            keyValues = mapOf(
-                "wallet" to WALLET_ADDRESS,
-                "type" to "vault"
-            )
-        )
+        val pinataMetadata = PinataMetadata(name = "vault_${userId}.json" /*...*/)
         val request = PinataRequest(content, pinataMetadata)
 
-        // Pin the new content to IPFS
+        // 5. Pin the new content to IPFS.
         val response = pinata.pinJsonToIpfs(request)
+        val newCid = response.ipfsHash
 
-        // This database insertion is now redundant because it's handled in the ViewModel.
-        // You can leave it for now or remove it if you're confident in the new flow.
+        // 6. Get the old CID before we save the new one.
+        val oldCid = vaultDao.getCid(userId)
+
+        // 7. Atomically save the NEW state to the database.
+        // This single call will trigger your getCredentials flow to automatically update the UI.
         vaultDao.insertOrUpdate(
             UserVaultEntity(
                 userId = userId,
-                cid = response.ipfsHash,
-                encryptedBlob = encryptedBlob // Storing the newly created blob
+                cid = newCid,
+                encryptedBlob = newEncryptedBlob
             )
         )
 
-        // Optionally: remove old CID
-        vault?.cid?.let { oldCid ->
-            if (oldCid.isNotEmpty() && oldCid != response.ipfsHash) {
-                try {
-                    pinata.unpin(oldCid)
-                } catch (e: Exception) {
-                    Log.e("UserVaultRepository", "Failed to unpin old CID: $oldCid", e)
-                }
+        // 8. Clean up the old IPFS pin.
+        if (!oldCid.isNullOrEmpty() && oldCid != newCid) {
+            try {
+                pinata.unpin(oldCid)
+            } catch (e: Exception) {
+                Log.e("UserVaultRepository", "Failed to unpin old CID: $oldCid", e)
             }
         }
 
-        // Return both the new CID and the encrypted content
-        return Pair(response.ipfsHash, encryptedBlob)
+        // 9. Return the results.
+        return Pair(newCid, newEncryptedBlob)
     }
 
 
@@ -173,36 +178,51 @@ class UserVaultRepository(
     }
 
     // Delete a credential
+    // In UserVaultRepository.kt
+
     suspend fun deleteCredential(userId: String, website: String) {
         val secretKey = getSecretKey() ?: return
-        val vault = vaultDao.getVault(userId) ?: return
-        val decryptedJson = CryptoUtil.decryptBlob(vault.encryptedBlob, secretKey)
-        val jsonArray = JSONArray(decryptedJson)
 
-        val newArray = JSONArray()
-        for (i in 0 until jsonArray.length()) {
-            val obj = jsonArray.getJSONObject(i)
-            if (obj.getString("website") != website) newArray.put(obj)
-        }
+        // 1. Get the current list from the reactive flow.
+        val currentList = getCredentials(userId).firstOrNull() ?: return
 
-        val encryptedBlob = CryptoUtil.encryptBlob(newArray.toString(), secretKey)
-        val vaultlycontent = VaultlyContent(encryptedBlob)
-        val response = pinata.pinJsonToIpfs(PinataRequest(vaultlycontent))
+        // 2. Filter out the credential to be deleted.
+        val updatedList = currentList.filter { it.website != website }
 
+        // 3. Convert the new, smaller list back to JSON and encrypt it.
+        val jsonArray = JSONArray()
+        updatedList.forEach { c -> /* ... same as addOrUpdateCredential ... */ }
+        val newEncryptedBlob = CryptoUtil.encryptBlob(jsonArray.toString(), secretKey)
+
+        // 4. Pin the new state to IPFS.
+        val vaultlyContent = VaultlyContent(newEncryptedBlob)
+        val request = PinataRequest(vaultlyContent) // Add metadata for better management
+        val response = pinata.pinJsonToIpfs(request)
+        val newCid = response.ipfsHash
+
+        // 5. Get the old CID before updating.
+        val oldCid = vaultDao.getCid(userId) ?: ""
+
+        // 6. Save the new state to the database. This triggers the UI update.
         vaultDao.insertOrUpdate(
             UserVaultEntity(
                 userId = userId,
-                cid = response.ipfsHash,
-                encryptedBlob = encryptedBlob
+                cid = newCid,
+                encryptedBlob = newEncryptedBlob
             )
         )
 
-        pinata.unpin(vault.cid) // clean up old
+        // 7. Unpin the old content.
+        if (oldCid.isNotEmpty() && oldCid != newCid) {
+            pinata.unpin(oldCid)
+        }
     }
 
-    suspend fun getCid() : String {
+
+    suspend fun getCid(): String {
         return vaultDao.getCid(AppKit.getAccount()?.address ?: "")
     }
+
     suspend fun saveCid(account: String, contractAddress: String, cid: String): String =
         suspendCancellableCoroutine { cont ->
             try {

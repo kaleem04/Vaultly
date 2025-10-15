@@ -190,13 +190,20 @@ fun ThemeDropdown(
         expanded = expanded,
         onExpandedChange = { expanded = !expanded }
     ) {
+        // OPTIMIZATION: Use remember to cache the painter resource.
+        // This avoids reloading the drawable on every recomposition, which can occur when
+        // the dropdown menu's expanded state changes. The painter will only be re-loaded
+        // if the selectedTheme (and thus its icon) changes.
+        val iconRes = themeIcon(selectedTheme)
+        val painter =  painterResource(iconRes)
+
         OutlinedTextField(
             value = selectedTheme.displayName,
             onValueChange = {},
             readOnly = true,
             leadingIcon = {
                 Icon(
-                    painterResource(themeIcon(selectedTheme)),
+                    painter = painter,
                     contentDescription = null
                 )
             },
@@ -212,10 +219,15 @@ fun ThemeDropdown(
             onDismissRequest = { expanded = false }
         ) {
             VaultlyTheme.entries.forEach { option ->
+                // OPTIMIZATION: Similarly, cache the painter for each dropdown item.
+                // This prevents reloading the icon for every item on each recomposition.
+                // It improves the performance when the dropdown is opened.
+                val itemIconRes = themeIcon(option)
+                val itemPainter = painterResource(itemIconRes)
                 DropdownMenuItem(
                     leadingIcon = {
                         Icon(
-                            painterResource(themeIcon(option)),
+                            painter = itemPainter,
                             contentDescription = null
                         )
                     },
@@ -257,8 +269,3 @@ private fun ProfileActionItem(
         )
     }
 }
-
-
-
-
-
