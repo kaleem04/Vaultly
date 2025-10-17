@@ -1,5 +1,6 @@
 package com.dapp.vaultly.ui.screens
 
+import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -37,17 +38,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.dapp.vaultly.R
 import com.dapp.vaultly.data.model.VaultlyTheme
+import com.dapp.vaultly.ui.viewmodels.AutofillSettingsViewModel
 import com.dapp.vaultly.ui.viewmodels.VaultlyThemeViewmodel
 
 
 @Composable
 fun ProfileScreen(
     vaultlyThemeViewmodel: VaultlyThemeViewmodel,
+    autofillSettingsViewModel: AutofillSettingsViewModel = hiltViewModel(),  // NEW
     walletAddress: String,
     userName: String? = null,
     onThemeClick: () -> Unit,
@@ -106,6 +111,8 @@ fun ProfileScreen(
             icon = Icons.Rounded.AccountCircle,
             onClick = onThemeClick
         )
+        // NEW: Autofill Settings
+        AutofillSettingsItem(viewModel = autofillSettingsViewModel)
 
         SectionHeader(title = "Theme")
         ThemeSettingsSection(viewModel = vaultlyThemeViewmodel)
@@ -195,7 +202,7 @@ fun ThemeDropdown(
         // the dropdown menu's expanded state changes. The painter will only be re-loaded
         // if the selectedTheme (and thus its icon) changes.
         val iconRes = themeIcon(selectedTheme)
-        val painter =  painterResource(iconRes)
+        val painter = painterResource(iconRes)
 
         OutlinedTextField(
             value = selectedTheme.displayName,
@@ -266,6 +273,56 @@ private fun ProfileActionItem(
         Text(
             text = title,
             style = MaterialTheme.typography.bodyLarge
+        )
+    }
+}
+
+@Composable
+private fun AutofillSettingsItem(viewModel: AutofillSettingsViewModel) {
+    val context = LocalContext.current
+    val activity = context as? Activity
+
+    val isEnabled by viewModel.isAutofillEnabled.collectAsState()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { viewModel.openAutofillSettings(activity ?: context) }
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.outline_light_mode_24),
+                contentDescription = "Autofill",
+                modifier = Modifier.size(24.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Column {
+                Text(
+                    text = "Autofill Service",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text = if (isEnabled) "Enabled" else "Not enabled",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (isEnabled)
+                        MaterialTheme.colorScheme.tertiary
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Switch(
+            checked = isEnabled,
+            onCheckedChange = {
+                viewModel.openAutofillSettings(activity ?: context)
+            }
         )
     }
 }

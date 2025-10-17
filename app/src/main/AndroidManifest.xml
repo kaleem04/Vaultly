@@ -18,6 +18,21 @@
         android:theme="@style/Theme.Vaultly"
         tools:replace="android:dataExtractionRules,android:fullBackupContent"
         >
+        <service
+            android:name="com.dapp.vaultly.autofill.VaultlyAutofillService"
+            android:permission="android.permission.BIND_AUTOFILL_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.autofill.AutofillService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.autofill"
+                android:resource="@xml/autofill_service_config" />
+        </service>
+        <activity
+            android:name="com.dapp.vaultly.autofill.ui.AuthenticateBeforeAutofillActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Vaultly" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

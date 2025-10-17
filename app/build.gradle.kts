@@ -51,6 +51,7 @@ android {
 }
 
 dependencies {
+    implementation("androidx.biometric:biometric:1.4.0-alpha02")
     val boomVersion ="1.4.11"
     val roomVersion = "2.8.0"
 
