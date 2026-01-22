@@ -7,6 +7,7 @@ import com.dapp.vaultly.data.model.Credential
 import com.dapp.vaultly.data.model.DashboardUiState
 import com.dapp.vaultly.data.repository.PolygonRepository
 import com.dapp.vaultly.data.repository.UserVaultRepository
+import com.dapp.vaultly.data.repository.VaultlyAutofillRepository
 import com.dapp.vaultly.util.Constants.CONTRACT_ADDRESS
 import com.reown.appkit.client.AppKit
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -27,7 +28,8 @@ import javax.inject.Inject
 @HiltViewModel
 class DashboardViewmodel @Inject constructor(
     private val vaultRepo: UserVaultRepository,
-    private val polygonRepository: PolygonRepository
+    private val polygonRepository: PolygonRepository,
+    private val vaultlyAutofillRepository: VaultlyAutofillRepository
 ) : ViewModel() {
 
     // 1. SINGLE SOURCE OF TRUTH: All old UiState flows are removed. This is all you need.
@@ -46,22 +48,30 @@ class DashboardViewmodel @Inject constructor(
         }
     }
 
-    // 3. UI-DRIVEN INITIALIZATION: The init block is removed. The UI calls onScreenReady() when it's time to load data.
-    fun onScreenReady() {
+    // 3. UI-DRIVEN INITIALIZATION: The UI calls onScreenReady() when it's time to load data.
+    //    By default we DO NOT auto-sync when the screen appears. Set `autoSync = true`
+    //    only if you intentionally want the Dashboard to trigger remote requests on open.
+    fun onScreenReady(autoSync: Boolean = false) {
         val userId = AppKit.getAccount()?.address
         if (userId == null) {
             _uiState.update { it.copy(userMessage = "User not logged in.") }
             return
         }
-        // These two functions will now manage the screen's state.
+        // Observe local DB first; this does NOT by itself perform remote network requests.
         observeLocalCredentials(userId)
-        refreshFromBlockchain(userId)
+
+        // Only trigger remote syncs if explicitly requested by the caller.
+        if (autoSync) {
+            refreshFromBlockchain(userId)
+            // Keep autofill sync separate; caller can call `triggerAutofillSync`.
+            viewModelScope.launch { vaultlyAutofillRepository.syncCredentials(userId) }
+        }
     }
 
     /**
      * REACTIVE DATA LOADING: Observes the local Room database via a Flow.
      * The UI will automatically update whenever the data changes in the DB.
-     * This is the only function that needs to put credentials into the state.
+     * This observer no longer triggers an autofill/network sync by default.
      */
     private fun observeLocalCredentials(userId: String) {
         vaultRepo.getCredentials(userId) // This now returns a Flow from the repo
@@ -70,6 +80,8 @@ class DashboardViewmodel @Inject constructor(
                 _uiState.update {
                     it.copy(isLoading = false, credentials = credentials)
                 }
+                // Removed automatic call to vaultlyAutofillRepository.syncCredentials(userId)
+                // to avoid unexpected network I/O on simple navigation.
             }
             .catch { exception ->
                 Log.e("DashboardVM", "Error observing credentials", exception)
@@ -86,6 +98,7 @@ class DashboardViewmodel @Inject constructor(
     /**
      * NETWORK SYNC: Fetches the latest CID from Polygon, gets content from Pinata,
      * and saves it to the database. The `observeLocalCredentials` flow will automatically handle the UI update.
+     * This function performs remote I/O and should be called only when a sync is desired.
      */
     fun refreshFromBlockchain(userId: String) {
         // Use the centralized error handler.
@@ -105,6 +118,18 @@ class DashboardViewmodel @Inject constructor(
     }
 
     /**
+     * Explicit UI action to trigger autofill credentials sync. This will perform network I/O.
+     */
+    fun triggerAutofillSync() {
+        val userId = AppKit.getAccount()?.address ?: return
+        viewModelScope.launch(errorHandler) {
+            _uiState.update { it.copy(isSyncing = true, userMessage = "Syncing autofill...") }
+            vaultlyAutofillRepository.syncCredentials(userId)
+            _uiState.update { it.copy(isSyncing = false, userMessage = "Autofill sync complete") }
+        }
+    }
+
+    /**
      * ACTION: Adds or updates a credential. It calls the repository, which updates the DB.
      * The reactive flow does the rest.
      */
@@ -112,7 +137,7 @@ class DashboardViewmodel @Inject constructor(
         viewModelScope.launch(errorHandler) {
             _uiState.update { it.copy(isLoading = true, userMessage = null) }
             vaultRepo.addOrUpdateCredential(userId, credential)
-            // isLoading will be set to false automatically by observeLocalCredentials.
+            // removed automatic autofill sync here; caller can decide to trigger it
             _uiState.update { it.copy(userMessage = "Credential saved.") }
         }
     }

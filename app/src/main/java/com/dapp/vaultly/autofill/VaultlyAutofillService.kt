@@ -10,12 +10,10 @@ import android.service.autofill.FillCallback
 import android.service.autofill.FillRequest
 import android.service.autofill.SaveCallback
 import android.service.autofill.SaveRequest
-import android.util.Log
 import android.view.autofill.AutofillId
+import android.view.autofill.AutofillValue
 import android.widget.RemoteViews
-import androidx.annotation.RequiresApi
 import com.dapp.vaultly.autofill.ui.AuthenticateBeforeAutofillActivity
-import com.dapp.vaultly.data.model.AutofillCredential
 import com.dapp.vaultly.data.repository.VaultlyAutofillRepository
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -23,6 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -34,10 +33,9 @@ class VaultlyAutofillService : AutofillService() {
 
     override fun onDestroy() {
         super.onDestroy()
-        serviceScope.cancel() // Cancel the scope to avoid leaks
+        serviceScope.cancel()
     }
 
-    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     override fun onFillRequest(
         request: FillRequest,
         cancellationSignal: CancellationSignal,
@@ -50,48 +48,77 @@ class VaultlyAutofillService : AutofillService() {
                 val clientPackageName = context.last().structure.activityComponent?.packageName
                     ?: "unknown"
 
-                Log.d("VaultlyAutofill", "Fill request from: $clientPackageName")
+                Timber.d("Fill request from: %s", clientPackageName)
 
-                // Parse the view structure to find autofill fields
                 val fieldMap = parseViewStructure(structure)
 
                 if (fieldMap.isEmpty()) {
-                    Log.d("VaultlyAutofill", "No autofill fields found in structure")
+                    Timber.d("No autofill fields found in structure")
                     callback.onSuccess(null)
                     return@launch
                 }
 
-                Log.d("VaultlyAutofill", "Found fields: ${fieldMap.keys}")
+                // Create authentication intent with proper flags
+                val authIntent = Intent(this@VaultlyAutofillService, AuthenticateBeforeAutofillActivity::class.java).apply {
+                    putExtra("CLIENT_PACKAGE_NAME", clientPackageName)
+                    putStringArrayListExtra("FIELD_KEYS", ArrayList(fieldMap.keys))
+                    putParcelableArrayListExtra("FIELD_IDS", ArrayList(fieldMap.values))
 
-                // Get matching credentials from your vault
-                val credentials = autofillRepository.getMatchingCredentials(clientPackageName)
-
-                if (credentials.isEmpty()) {
-                    Log.d("VaultlyAutofill", "No matching credentials found")
-                    callback.onSuccess(null)
-                    return@launch
+                    // Critical flags to prevent launching your app
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                            Intent.FLAG_ACTIVITY_NO_HISTORY or
+                            Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
                 }
 
-                Log.d("VaultlyAutofill", "Found ${credentials.size} matching credentials")
+                val immutableFlag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    PendingIntent.FLAG_IMMUTABLE
+                } else {
+                    0
+                }
+                val pendingFlags = PendingIntent.FLAG_CANCEL_CURRENT or immutableFlag
 
-                // Build and send fill response with authentication gate
-                val fillResponse = buildFillResponse(credentials, fieldMap)
-                callback.onSuccess(fillResponse)
+                val authIntentSender = PendingIntent.getActivity(
+                    this@VaultlyAutofillService,
+                    request.hashCode(),
+                    authIntent,
+                    pendingFlags
+                ).intentSender
+
+                // Create presentation
+                val presentation = RemoteViews(
+                    packageName,
+                    android.R.layout.simple_list_item_1
+                ).apply {
+                    setTextViewText(android.R.id.text1, "Use saved passwords")
+                }
+
+                val datasetBuilder = android.service.autofill.Dataset.Builder()
+
+                // Set empty values for all fields to trigger authentication
+                fieldMap.forEach { (_, autofillId) ->
+                    datasetBuilder.setValue(
+                        autofillId,
+                        AutofillValue.forText(""),
+                        presentation
+                    )
+                }
+
+                val responseBuilder = android.service.autofill.FillResponse.Builder()
+                    .setAuthentication(fieldMap.values.toTypedArray(), authIntentSender, presentation)
+                    .addDataset(datasetBuilder.build())
+
+                val response = responseBuilder.build()
+                callback.onSuccess(response)
 
             } catch (e: Exception) {
-                Log.e("VaultlyAutofill", "Error in onFillRequest", e)
+                Timber.e(e, "Error in onFillRequest")
                 callback.onSuccess(null)
             }
         }
     }
 
-    override fun onSaveRequest(
-        request: SaveRequest,
-        callback: SaveCallback
-    ) {
-        // Optional: Implement credential saving from forms
-        // For now, just acknowledge
-        Log.d("VaultlyAutofill", "Save request received")
+    override fun onSaveRequest(request: SaveRequest, callback: SaveCallback) {
         callback.onSuccess()
     }
 
@@ -99,86 +126,50 @@ class VaultlyAutofillService : AutofillService() {
         val fieldMap = mutableMapOf<String, AutofillId>()
 
         fun traverse(node: AssistStructure.ViewNode) {
-            val autofillId = node.autofillId
-            val hints = node.autofillHints
+            val autofillId = node.autofillId ?: return
 
-            if (autofillId != null && !hints.isNullOrEmpty()) {
+            val hints = node.autofillHints
+            if (!hints.isNullOrEmpty()) {
                 for (hint in hints) {
-                    val hintLower = hint.lowercase() // Use lowercase for comparison
-                    if (hintLower.contains("username") && !fieldMap.containsKey("username")) {
-                        fieldMap["username"] = autofillId
-                    } else if (hintLower.contains("email") && !fieldMap.containsKey("email")) {
-                        fieldMap["email"] = autofillId
-                    } else if (hintLower.contains("password") && !fieldMap.containsKey("password")) {
-                        fieldMap["password"] = autofillId
+                    when {
+                        hint.contains("username", ignoreCase = true) -> fieldMap["username"] = autofillId
+                        hint.contains("email", ignoreCase = true) -> fieldMap["email"] = autofillId
+                        hint.contains("password", ignoreCase = true) -> fieldMap["password"] = autofillId
                     }
+                }
+            } else {
+                val idEntry = node.idEntry?.lowercase() ?: ""
+                val hint = node.hint?.lowercase() ?: ""
+                val text = node.text?.toString()?.lowercase() ?: ""
+
+                when {
+                    listOf(idEntry, hint, text).any { it.contains("user") || it.contains("email") || it.contains("login") }
+                            && !fieldMap.containsKey("username") -> fieldMap["username"] = autofillId
+                    listOf(idEntry, hint, text).any { it.contains("pass") || it.contains("pwd") }
+                            && !fieldMap.containsKey("password") -> fieldMap["password"] = autofillId
+                    listOf(idEntry, hint, text).any { it.contains("email") }
+                            && !fieldMap.containsKey("email") -> fieldMap["email"] = autofillId
+                }
+
+                val variation = node.inputType and android.text.InputType.TYPE_MASK_VARIATION
+                if ((variation == android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD ||
+                            variation == android.text.InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD)
+                    && !fieldMap.containsKey("password")) {
+                    fieldMap["password"] = autofillId
                 }
             }
 
-            // Traverse child nodes
             for (i in 0 until node.childCount) {
-                node.getChildAt(i)?.let { traverse(it) } // Use safe call
+                node.getChildAt(i)?.let { traverse(it) }
             }
         }
 
+        try {
+            traverse(structure.getWindowNodeAt(0).rootViewNode)
+        } catch (e: Exception) {
+            Timber.e(e, "Error parsing view structure")
+        }
 
-        traverse(structure.getWindowNodeAt(0).rootViewNode)
         return fieldMap
-    }
-
-    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
-    private fun buildFillResponse(
-        credentials: List<AutofillCredential>,
-        fieldMap: Map<String, AutofillId>
-    ): android.service.autofill.FillResponse? {
-        val responseBuilder = android.service.autofill.FillResponse.Builder()
-
-        for (credential in credentials) {
-            // 1. Create the presentation (what the user sees in the dropdown)
-            val presentation = createPresentation(credential.username)
-
-            // 2. Create an authentication IntentSender. This is crucial.
-            // When the user taps the suggestion, the system fires this intent.
-            // Your app (via an Activity) will receive it, authenticate the user
-            // (e.g., biometrics), and then return the full dataset.
-            val authIntent = Intent(this, AuthenticateBeforeAutofillActivity::class.java).apply {
-                putExtra("CREDENTIAL_ID", credential.id) // Pass an ID to fetch the credential
-                putExtra("FIELD_MAP", HashMap(fieldMap)) // Pass the field map
-            }
-            val authIntentSender = PendingIntent.getActivity(
-                this,
-                credential.id.hashCode(), // Unique request code
-                authIntent,
-                PendingIntent.FLAG_CANCEL_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            ).intentSender
-
-
-            // 3. Build a dataset that requires authentication.
-            // DO NOT add sensitive data here.
-            val datasetBuilder = android.service.autofill.Dataset.Builder(presentation)
-                .setAuthentication(authIntentSender)
-
-            // Associate the IDs to the dataset so the system knows which fields this dataset can fill.
-            fieldMap["username"]?.let { datasetBuilder.setField(it, null) }
-            fieldMap["email"]?.let { datasetBuilder.setField(it, null) }
-            fieldMap["password"]?.let { datasetBuilder.setField(it, null) }
-
-
-            responseBuilder.addDataset(datasetBuilder.build())
-        }
-
-        val response = responseBuilder.build()
-
-        return response
-    }
-
-
-    private fun createPresentation(label: String): RemoteViews {
-        val remoteViews = RemoteViews(
-            packageName,
-            android.R.layout.simple_list_item_1
-        )
-        remoteViews.setTextViewText(android.R.id.text1, label)
-        return remoteViews
     }
 }

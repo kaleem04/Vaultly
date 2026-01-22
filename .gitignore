@@ -13,3 +13,5 @@
 .externalNativeBuild
 .cxx
 local.properties
+/.idea/copilot.data.migration.edit.xml
+/.idea/dictionaries/project.xml

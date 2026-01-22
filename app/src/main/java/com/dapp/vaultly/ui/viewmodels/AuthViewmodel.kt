@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dapp.vaultly.data.local.AesKeyStorage
 import com.dapp.vaultly.data.model.WalletUiState
+import com.dapp.vaultly.data.repository.VaultlyAutofillRepository
 import com.dapp.vaultly.util.CryptoUtil
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -20,6 +21,7 @@ import kotlin.system.measureTimeMillis
 @HiltViewModel
 class AuthViewmodel @Inject constructor(
     private val context: Application,
+    private val vaultlyAutofillRepository: VaultlyAutofillRepository
 ) : ViewModel() {
     private val _uiState =
         MutableStateFlow<WalletUiState>(WalletUiState.Loading) // Initial state as Loading
@@ -73,6 +75,7 @@ class AuthViewmodel @Inject constructor(
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 AesKeyStorage.clearKey(context)
+                vaultlyAutofillRepository.clearCredentials()
             }
             _uiState.value = WalletUiState.Welcome
         }

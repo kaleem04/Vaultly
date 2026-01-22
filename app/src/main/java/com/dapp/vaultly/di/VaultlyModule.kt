@@ -11,12 +11,10 @@ import com.dapp.vaultly.data.remote.PolygonApiService
 import com.dapp.vaultly.data.repository.CredentialRepository
 import com.dapp.vaultly.data.repository.PolygonRepository
 import com.dapp.vaultly.data.repository.UserVaultRepository
-import com.dapp.vaultly.data.repository.VaultlyAutofillRepository
 import com.dapp.vaultly.util.Constants
 import com.dapp.vaultly.util.Constants.IPFS_URL
 import com.dapp.vaultly.util.Constants.PINATA_URL
 import com.dapp.vaultly.util.Constants.POLYGON_URL
-import com.dapp.vaultly.util.Constants.TEST_SIGNATURE
 import com.dapp.vaultly.util.CryptoUtil
 import com.dapp.vaultly.util.IpfsGateway
 import com.dapp.vaultly.util.PinataApi
@@ -119,14 +117,6 @@ object VaultlyModule {
             .addInterceptor(logging)
             .addInterceptor(authInterceptor)
             .build()
-    }
-    @Provides
-    @Singleton
-    fun provideAutofillRepository(
-        vaultRepository: UserVaultRepository,
-        context: Context
-    ): VaultlyAutofillRepository {
-        return VaultlyAutofillRepository(vaultRepository, context)
     }
     @IpfsGateway
     @Provides
