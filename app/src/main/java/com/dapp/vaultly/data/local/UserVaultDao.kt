@@ -15,7 +15,7 @@ interface UserVaultDao {
     fun getVault(userId: String): Flow<UserVaultEntity?>
 
     @Query("SELECT cid FROM user_vaults WHERE userId = :userId")
-    suspend fun getCid(userId: String) : String
+    suspend fun getCid(userId: String) : String?
     @Query("DELETE FROM user_vaults WHERE userId = :userId")
     suspend fun deleteVault(userId: String)
 }

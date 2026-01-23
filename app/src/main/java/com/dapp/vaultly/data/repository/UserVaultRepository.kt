@@ -220,7 +220,7 @@ class UserVaultRepository(
 
 
     suspend fun getCid(): String {
-        return vaultDao.getCid(AppKit.getAccount()?.address ?: "")
+        return vaultDao.getCid(AppKit.getAccount()?.address ?: "") ?: ""
     }
 
     suspend fun saveCid(account: String, contractAddress: String, cid: String): String =

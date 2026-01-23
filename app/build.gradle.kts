@@ -56,7 +56,7 @@ dependencies {
     implementation("androidx.security:security-crypto:1.1.0")
 
     //biometric dependecy
-    implementation("androidx.biometric:biometric:1.4.0-alpha02")
+    implementation("androidx.biometric:biometric:1.4.0-alpha05")
     val boomVersion ="1.4.11"
     val roomVersion = "2.8.0"
 
@@ -65,7 +65,7 @@ dependencies {
     //retrofit
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     //gson converter
-    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:3.0.0")
 // Or the latest stable version
     //hilt
     implementation("com.google.dagger:hilt-android:2.57.1")
@@ -83,9 +83,9 @@ dependencies {
     //google accompanist
     implementation("com.google.accompanist:accompanist-navigation-material:0.36.0")
     //compose navigation
-    implementation("androidx.navigation:navigation-compose:2.9.4")
+    implementation("androidx.navigation:navigation-compose:2.9.6")
     //DataStore
-    implementation("androidx.datastore:datastore-preferences:1.1.7")
+    implementation("androidx.datastore:datastore-preferences:1.2.0")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)

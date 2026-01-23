@@ -60,9 +60,17 @@ class DashboardViewmodel @Inject constructor(
         // Observe local DB first; this does NOT by itself perform remote network requests.
         observeLocalCredentials(userId)
 
-        // Only trigger remote syncs if explicitly requested by the caller.
+        // Only perform an automatic blockchain refresh if there is no local CID yet
+        // (e.g. fresh install or DB cleared). This prevents repeated auto-syncs.
+        viewModelScope.launch(errorHandler) {
+            val localCid = withContext(Dispatchers.IO) { vaultRepo.getCid() }
+            if (localCid.isEmpty()) {
+                refreshFromBlockchain(userId)
+            }
+        }
+
+        // Only trigger remote autofill syncs if explicitly requested by the caller.
         if (autoSync) {
-            refreshFromBlockchain(userId)
             // Keep autofill sync separate; caller can call `triggerAutofillSync`.
             viewModelScope.launch { vaultlyAutofillRepository.syncCredentials(userId) }
         }
