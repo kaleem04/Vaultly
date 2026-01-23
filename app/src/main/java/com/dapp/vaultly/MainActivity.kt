@@ -2,12 +2,13 @@ package com.dapp.vaultly
 
 import android.os.Bundle
 import android.util.Log
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.fragment.app.FragmentActivity
 import com.dapp.vaultly.ui.theme.VaultlyTheme
 import com.dapp.vaultly.ui.viewmodels.AuthViewmodel
+import com.dapp.vaultly.ui.viewmodels.LockViewModel
 import com.dapp.vaultly.ui.viewmodels.VaultlyThemeViewmodel
 import com.reown.android.Core
 import com.reown.android.CoreClient
@@ -17,11 +18,15 @@ import com.reown.appkit.client.Modal
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
 
     val authViewmodel by viewModels<AuthViewmodel>()
     val themeViewmodel by viewModels<VaultlyThemeViewmodel>()
-    private val context = this
+    private val lockViewModel by viewModels<LockViewModel>()
+
+    // Track when app was truly backgrounded (not just paused for system dialogs)
+    private var appBackgroundedTime: Long = 0L
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val connectionType = ConnectionType.AUTOMATIC
@@ -95,6 +100,21 @@ class MainActivity : ComponentActivity() {
         }
 
 
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // App is going to background - record the time
+        appBackgroundedTime = System.currentTimeMillis()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // App is coming to foreground - check if we need to lock
+        if (appBackgroundedTime > 0) {
+            lockViewModel.lockIfNeeded()
+            appBackgroundedTime = 0L
+        }
     }
 
     fun vaultlyDelegate(authViewModel: AuthViewmodel): AppKit.ModalDelegate {

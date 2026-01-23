@@ -1,6 +1,7 @@
 package com.dapp.vaultly
 
 import android.util.Log
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -36,10 +37,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.fragment.app.FragmentActivity
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -49,12 +52,15 @@ import com.dapp.vaultly.data.model.VaultlyRoutes
 import com.dapp.vaultly.data.model.WalletUiState
 import com.dapp.vaultly.ui.screens.AddPasswordBottomSheetContent
 import com.dapp.vaultly.ui.screens.DashboardScreen
+import com.dapp.vaultly.ui.screens.LockScreen
 import com.dapp.vaultly.ui.screens.ProfileScreen
 import com.dapp.vaultly.ui.screens.SplashScreen
 import com.dapp.vaultly.ui.screens.WelcomeScreen
 import com.dapp.vaultly.ui.viewmodels.AddPasswordViewmodel
 import com.dapp.vaultly.ui.viewmodels.AuthViewmodel
 import com.dapp.vaultly.ui.viewmodels.DashboardViewmodel
+import com.dapp.vaultly.ui.viewmodels.LockUiState
+import com.dapp.vaultly.ui.viewmodels.LockViewModel
 import com.dapp.vaultly.ui.viewmodels.VaultlyThemeViewmodel
 import com.google.accompanist.navigation.material.ExperimentalMaterialNavigationApi
 import com.reown.appkit.client.AppKit
@@ -84,9 +90,13 @@ fun VaultlyApp(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val dashboardViewmodel: DashboardViewmodel = hiltViewModel()
+    val lockViewModel: LockViewModel = hiltViewModel()
     var onSearchClick by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val authState by authViewmodel.uiState.collectAsStateWithLifecycle()
+    // Observe lock state early so navigation composables can decide whether to render secured content
+    val lockState by lockViewModel.uiState.collectAsStateWithLifecycle()
+
     // Read the state from the ViewModel. This will trigger recomposition when it changes.
     val openAddPasswordSheet = addPasswordViewmodel.openSheet
     val shouldShowBars by remember(currentRoute) {
@@ -184,13 +194,19 @@ fun VaultlyApp(
                         onConfirm = { requestPersonalSign(AppKit.getAccount()?.address ?: "") }
                     )
                 } else {
-                    DashboardScreen(
-                        addPasswordViewmodel = addPasswordViewmodel,
-                        search = onSearchClick,
-                        contentPaddingValues = paddingValues,
-                        dashboardViewmodel = dashboardViewmodel,
-                        snackbarHostState = snackbarHostState
-                    )
+                    // Only render the dashboard when unlocked. When locked, render an empty placeholder
+                    if (lockState is LockUiState.Unlocked) {
+                        DashboardScreen(
+                            addPasswordViewmodel = addPasswordViewmodel,
+                            search = onSearchClick,
+                            contentPaddingValues = paddingValues,
+                            dashboardViewmodel = dashboardViewmodel,
+                            snackbarHostState = snackbarHostState
+                        )
+                    } else {
+                        // Placeholder while locked (keeps content from rendering)
+                        androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize()) { }
+                    }
                 }
             }
             composable(route = VaultlyRoutes.PROFILESCREEN.name) {
@@ -226,6 +242,13 @@ fun VaultlyApp(
                 viewModel = addPasswordViewmodel
             )
         }
+    }
+
+    // Lock overlay: show LockScreen when authState is DashboardReady and lockViewModel requires unlock
+    val ctx = LocalContext.current
+    val activity = ctx as? FragmentActivity
+    if (activity != null && (authState is WalletUiState.DashboardReady) && lockState !is LockUiState.Unlocked) {
+        LockScreen(activity = activity, onUnlocked = { /* no-op, LockViewModel handles state */ })
     }
 }
 

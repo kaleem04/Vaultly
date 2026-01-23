@@ -3,6 +3,7 @@ package com.dapp.vaultly.di
 import android.content.Context
 import androidx.room.Room
 import com.dapp.vaultly.data.local.CredentialsDao
+import com.dapp.vaultly.data.local.SecureStorage
 import com.dapp.vaultly.data.local.UserVaultDao
 import com.dapp.vaultly.data.local.VaultlyDatabase
 import com.dapp.vaultly.data.remote.IpfsGatewayService
@@ -218,5 +219,11 @@ object VaultlyModule {
         polygonApiService: PolygonApiService
     ): PolygonRepository {
         return PolygonRepository(polygonApiService)
+    }
+
+    @Provides
+    @Singleton
+    fun provideSecureStorage(@ApplicationContext context: Context): SecureStorage {
+        return SecureStorage(context)
     }
 }

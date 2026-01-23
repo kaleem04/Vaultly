@@ -55,8 +55,8 @@ dependencies {
     //android keystore
     implementation("androidx.security:security-crypto:1.1.0")
 
-    //biometric dependecy
-    implementation("androidx.biometric:biometric:1.4.0-alpha05")
+    //biometric dependency
+    implementation("androidx.biometric:biometric:1.1.0")
     val boomVersion ="1.4.11"
     val roomVersion = "2.8.0"
 

@@ -36,6 +36,9 @@ class DashboardViewmodel @Inject constructor(
     private val _uiState = MutableStateFlow(DashboardUiState())
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
 
+    // Track if initialization has been done to avoid repeated calls
+    private var isInitialized = false
+
     // 2. CENTRALIZED ERROR HANDLER: Simplifies every function.
     private val errorHandler = CoroutineExceptionHandler { _, exception ->
         Log.e("DashboardVM", "A coroutine error occurred", exception)
@@ -52,6 +55,10 @@ class DashboardViewmodel @Inject constructor(
     //    By default we DO NOT auto-sync when the screen appears. Set `autoSync = true`
     //    only if you intentionally want the Dashboard to trigger remote requests on open.
     fun onScreenReady(autoSync: Boolean = false) {
+        // Prevent re-initialization on every navigation
+        if (isInitialized) return
+        isInitialized = true
+
         val userId = AppKit.getAccount()?.address
         if (userId == null) {
             _uiState.update { it.copy(userMessage = "User not logged in.") }

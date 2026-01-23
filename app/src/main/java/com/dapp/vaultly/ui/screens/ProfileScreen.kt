@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.rounded.AccountCircle
+import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -43,9 +44,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dapp.vaultly.R
 import com.dapp.vaultly.data.model.VaultlyTheme
 import com.dapp.vaultly.ui.viewmodels.AutofillSettingsViewModel
+import com.dapp.vaultly.ui.viewmodels.LockViewModel
 import com.dapp.vaultly.ui.viewmodels.VaultlyThemeViewmodel
 
 
@@ -113,6 +116,10 @@ fun ProfileScreen(
         )
         // NEW: Autofill Settings
         AutofillSettingsItem(viewModel = autofillSettingsViewModel)
+
+        // NEW: App Lock settings
+        SectionHeader(title = "Security")
+        LockSettingsItem()
 
         SectionHeader(title = "Theme")
         ThemeSettingsSection(viewModel = vaultlyThemeViewmodel)
@@ -324,5 +331,31 @@ private fun AutofillSettingsItem(viewModel: AutofillSettingsViewModel) {
                 viewModel.openAutofillSettings(activity ?: context)
             }
         )
+    }
+}
+
+@Composable
+fun LockSettingsItem(lockViewModel: LockViewModel = hiltViewModel()) {
+    val isEnabled by lockViewModel.lockEnabled.collectAsStateWithLifecycle()
+    // No PIN inputs - biometric/device lock only
+
+    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column {
+                Text("App Lock")
+                Text(if (isEnabled) "Enabled (Biometric)" else "Disabled", style = MaterialTheme.typography.bodySmall)
+            }
+            Switch(checked = isEnabled, onCheckedChange = { enabled ->
+                if (enabled) {
+                    lockViewModel.setLockEnabled(true)
+                } else {
+                    lockViewModel.disableLock()
+                }
+            })
+        }
     }
 }
