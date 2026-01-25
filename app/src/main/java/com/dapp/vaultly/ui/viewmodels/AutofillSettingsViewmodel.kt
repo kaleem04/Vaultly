@@ -3,14 +3,19 @@ package com.dapp.vaultly.ui.viewmodels
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
+import android.view.autofill.AutofillManager
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import javax.inject.Inject
+
 @HiltViewModel
 class AutofillSettingsViewModel @Inject constructor(
-    private val context: Context
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
     private val _isAutofillEnabled = MutableStateFlow(false)
     val isAutofillEnabled: StateFlow<Boolean> = _isAutofillEnabled
@@ -19,15 +24,16 @@ class AutofillSettingsViewModel @Inject constructor(
         checkAutofillStatus()
     }
 
-    private fun checkAutofillStatus() {
-        // Check if Vaultly is the active autofill service
-        val enabledServices = Settings.Secure.getString(
-            context.contentResolver,
-            Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE
-        ) ?: ""
-
-        val isEnabled = enabledServices.contains("com.dapp.vaultly/.autofill.VaultlyAutofillService")
-        _isAutofillEnabled.value = isEnabled
+    fun checkAutofillStatus() {
+        viewModelScope.launch {
+            try {
+                val autofillManager = context.getSystemService(AutofillManager::class.java)
+                val isEnabled = autofillManager?.hasEnabledAutofillServices() == true
+                _isAutofillEnabled.value = isEnabled
+            } catch (e: Exception) {
+                _isAutofillEnabled.value = false
+            }
+        }
     }
 
     fun openAutofillSettings(context: Context) {
@@ -35,7 +41,10 @@ class AutofillSettingsViewModel @Inject constructor(
             data = android.net.Uri.parse("package:com.dapp.vaultly")
         }
         context.startActivity(intent)
-        // Recheck status after returning
+    }
+
+    // Call this when returning from settings
+    fun onResume() {
         checkAutofillStatus()
     }
 }

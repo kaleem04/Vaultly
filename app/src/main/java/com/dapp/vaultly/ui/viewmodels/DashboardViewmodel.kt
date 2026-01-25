@@ -74,6 +74,11 @@ class DashboardViewmodel @Inject constructor(
             if (localCid.isEmpty()) {
                 refreshFromBlockchain(userId)
             }
+
+            // CRITICAL: Sync credentials to autofill cache on first dashboard load
+            // This ensures autofill has credentials available even when app is closed
+            Log.d("DashboardVM", "Syncing credentials to autofill cache...")
+            vaultlyAutofillRepository.syncCredentials(userId)
         }
 
         // Only trigger remote autofill syncs if explicitly requested by the caller.
@@ -152,7 +157,8 @@ class DashboardViewmodel @Inject constructor(
         viewModelScope.launch(errorHandler) {
             _uiState.update { it.copy(isLoading = true, userMessage = null) }
             vaultRepo.addOrUpdateCredential(userId, credential)
-            // removed automatic autofill sync here; caller can decide to trigger it
+            // Auto-sync to autofill cache after saving
+            vaultlyAutofillRepository.syncCredentials(userId)
             _uiState.update { it.copy(userMessage = "Credential saved.") }
         }
     }
@@ -165,6 +171,8 @@ class DashboardViewmodel @Inject constructor(
         viewModelScope.launch(errorHandler) {
             _uiState.update { it.copy(isLoading = true, userMessage = null) }
             vaultRepo.deleteCredential(userId, website)
+            // Auto-sync to autofill cache after deleting
+            vaultlyAutofillRepository.syncCredentials(userId)
             // isLoading will be set to false automatically by observeLocalCredentials.
             _uiState.update { it.copy(userMessage = "Credential deleted.") }
         }

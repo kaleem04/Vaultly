@@ -134,15 +134,18 @@ class VaultlyAutofillRepository @Inject constructor(
     }
 
     /**
-     * Get credentials for autofill
+     * Get credentials for autofill with improved logging and fallback
      * Note: Biometric security is enforced in AuthenticateBeforeAutofillActivity,
      * not at the key level. This allows the key to work when app is closed.
      */
     suspend fun getMatchingCredentials(packageName: String): List<AutofillCredential> {
         return withContext(Dispatchers.IO) {
             try {
+                Log.d("VaultlyAutofill", "=== Starting getMatchingCredentials for $packageName ===")
+
                 // Try to get current user ID
                 var userId = AppKit.getAccount()?.address
+                Log.d("VaultlyAutofill", "AppKit userId: $userId")
 
                 // If app is closed, get last logged in user from DataStore
                 if (userId == null) {
@@ -153,7 +156,7 @@ class VaultlyAutofillRepository @Inject constructor(
                 }
 
                 if (userId == null) {
-                    Log.d("VaultlyAutofill", "No user ID found")
+                    Log.e("VaultlyAutofill", "No user ID found - user not logged in or never synced")
                     return@withContext emptyList()
                 }
 
@@ -163,41 +166,116 @@ class VaultlyAutofillRepository @Inject constructor(
                 }.first()
 
                 if (encryptedData == null) {
-                    Log.d("VaultlyAutofill", "No cached credentials found")
+                    Log.e("VaultlyAutofill", "No cached credentials found in DataStore")
+                    Log.e("VaultlyAutofill", "Credentials need to be synced first!")
+                    Log.e("VaultlyAutofill", "User should: 1) Open Vaultly app, 2) Go to Dashboard, 3) Credentials will auto-sync")
                     return@withContext emptyList()
                 }
+
+                Log.d("VaultlyAutofill", "Encrypted data found, attempting to decrypt...")
 
                 // Decrypt credentials
                 val decryptedJson = decryptCredentials(encryptedData)
                 if (decryptedJson == null) {
-                    Log.e("VaultlyAutofill", "Failed to decrypt credentials")
+                    Log.e("VaultlyAutofill", "Failed to decrypt credentials - keystore issue?")
                     return@withContext emptyList()
                 }
 
+                Log.d("VaultlyAutofill", "Decryption successful, parsing JSON...")
+
                 // Parse JSON
                 val jsonArray = JSONArray(decryptedJson)
-                val credentials = mutableListOf<AutofillCredential>()
+                val allCredentials = mutableListOf<AutofillCredential>()
 
                 for (i in 0 until jsonArray.length()) {
                     val obj = jsonArray.getJSONObject(i)
-                    credentials.add(
+                    allCredentials.add(
                         AutofillCredential(
                             id = "$userId-$i",
                             website = obj.getString("website"),
                             username = obj.getString("username"),
                             password = obj.getString("password"),
-                            note = obj.getString("note")
+                            note = obj.optString("note", "")
                         )
                     )
                 }
 
-                Log.d("VaultlyAutofill", "Successfully loaded ${credentials.size} credentials for package: $packageName")
-                credentials
+                Log.d("VaultlyAutofill", "Parsed ${allCredentials.size} total credentials")
+                allCredentials.forEach {
+                    Log.d("VaultlyAutofill", "  - ${it.website}: ${it.username}")
+                }
+
+                // Filter credentials that match the requesting package/domain
+                val matchingCredentials = allCredentials.filter { credential ->
+                    matchesDomain(credential.website, packageName)
+                }
+
+                Log.d("VaultlyAutofill", "Found ${matchingCredentials.size} matching credentials for $packageName")
+
+                // If no exact matches, return all credentials so user can choose
+                if (matchingCredentials.isEmpty()) {
+                    Log.d("VaultlyAutofill", "No exact matches, returning all ${allCredentials.size} credentials")
+                    return@withContext allCredentials
+                }
+
+                matchingCredentials
             } catch (e: Exception) {
-                Log.e("VaultlyAutofill", "Error getting credentials", e)
+                Log.e("VaultlyAutofill", "Error getting credentials: ${e.message}", e)
                 emptyList()
             }
         }
+    }
+
+    /**
+     * Check if a credential's website matches the requesting package/domain
+     */
+    private fun matchesDomain(website: String, packageName: String): Boolean {
+        val websiteLower = website.lowercase()
+        val packageLower = packageName.lowercase()
+
+        // Direct match
+        if (websiteLower.contains(packageLower) || packageLower.contains(websiteLower)) {
+            return true
+        }
+
+        // Extract domain keywords
+        val packageParts = packageLower.split(".")
+        val websiteParts = websiteLower.split(".", "/", "-", "_")
+
+        // Common app name mappings
+        val knownMappings = mapOf(
+            "facebook" to listOf("fb", "facebook", "meta"),
+            "google" to listOf("google", "gmail", "goo", "youtube"),
+            "twitter" to listOf("twitter", "x"),
+            "instagram" to listOf("instagram", "ig"),
+            "microsoft" to listOf("microsoft", "ms", "msn", "outlook", "office"),
+            "amazon" to listOf("amazon", "aws"),
+            "netflix" to listOf("netflix", "nflx")
+        )
+
+        // Check if any part of the package matches any part of the website
+        for (packagePart in packageParts) {
+            if (packagePart.length <= 2) continue // Skip short parts like "com", "co", "uk"
+
+            for (websitePart in websiteParts) {
+                if (websitePart.length <= 2) continue
+
+                // Direct part match
+                if (packagePart == websitePart) {
+                    return true
+                }
+
+                // Check known mappings
+                knownMappings.forEach { (key, aliases) ->
+                    if ((packagePart in aliases || packagePart == key) &&
+                        (websitePart in aliases || websitePart == key)) {
+                        return true
+                    }
+                }
+            }
+        }
+
+        return false
     }
 
     private fun encryptCredentials(data: String): String? {

@@ -37,8 +37,7 @@
             android:theme="@style/TransparentDialogTheme"
             android:taskAffinity=""
             android:excludeFromRecents="true"
-            android:launchMode="singleInstance"
-            android:noHistory="true"
+            android:launchMode="singleTop"
             android:configChanges="orientation|screenSize|keyboardHidden" />
         <activity
             android:name=".MainActivity"

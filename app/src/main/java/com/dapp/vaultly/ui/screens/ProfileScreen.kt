@@ -31,6 +31,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -288,12 +289,30 @@ private fun ProfileActionItem(
 private fun AutofillSettingsItem(viewModel: AutofillSettingsViewModel) {
     val context = LocalContext.current
     val activity = context as? Activity
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
 
-    val isEnabled by viewModel.isAutofillEnabled.collectAsState()
+    // Recheck status when screen is resumed
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                viewModel.onResume()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    val isEnabled by viewModel.isAutofillEnabled.collectAsStateWithLifecycle()
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { viewModel.openAutofillSettings(activity ?: context) }
+            .clickable {
+                // Open settings when clicking the row (not the switch)
+                viewModel.openAutofillSettings(activity ?: context)
+            }
             .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
@@ -315,7 +334,7 @@ private fun AutofillSettingsItem(viewModel: AutofillSettingsViewModel) {
                     style = MaterialTheme.typography.bodyLarge
                 )
                 Text(
-                    text = if (isEnabled) "Enabled" else "Not enabled",
+                    text = if (isEnabled) "Enabled • Tap to manage" else "Disabled • Tap to enable",
                     style = MaterialTheme.typography.bodySmall,
                     color = if (isEnabled)
                         MaterialTheme.colorScheme.tertiary
@@ -325,9 +344,11 @@ private fun AutofillSettingsItem(viewModel: AutofillSettingsViewModel) {
             }
         }
 
+        // Switch shows status and is also clickable
         Switch(
             checked = isEnabled,
             onCheckedChange = {
+                // Also open settings when clicking switch
                 viewModel.openAutofillSettings(activity ?: context)
             }
         )
