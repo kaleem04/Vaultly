@@ -19,6 +19,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
@@ -110,11 +111,6 @@ fun ProfileScreen(
 
         // --- Settings Section ---
         SectionHeader(title = "Settings")
-        ProfileActionItem(
-            title = "Language",
-            icon = Icons.Rounded.AccountCircle,
-            onClick = onThemeClick
-        )
         // NEW: Autofill Settings
         AutofillSettingsItem(viewModel = autofillSettingsViewModel)
 
@@ -366,6 +362,7 @@ fun LockSettingsItem(lockViewModel: LockViewModel = hiltViewModel()) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
+            Icon(Icons.Default.Lock,contentDescription = null)
             Column {
                 Text("App Lock")
                 Text(if (isEnabled) "Enabled (Biometric)" else "Disabled", style = MaterialTheme.typography.bodySmall)

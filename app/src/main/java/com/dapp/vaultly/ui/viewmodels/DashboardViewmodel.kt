@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dapp.vaultly.data.model.Credential
+import com.dapp.vaultly.data.model.CredentialType
 import com.dapp.vaultly.data.model.DashboardUiState
 import com.dapp.vaultly.data.repository.PolygonRepository
 import com.dapp.vaultly.data.repository.UserVaultRepository
@@ -13,10 +14,13 @@ import com.reown.appkit.client.AppKit
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
@@ -36,6 +40,12 @@ class DashboardViewmodel @Inject constructor(
     private val _uiState = MutableStateFlow(DashboardUiState())
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
 
+    // Search query flow with debounce
+    private val _searchQuery = MutableStateFlow("")
+
+    // Active tab filter (null = show all)
+    private val _activeTab = MutableStateFlow<CredentialType?>(null)
+
     // Track if initialization has been done to avoid repeated calls
     private var isInitialized = false
 
@@ -49,6 +59,57 @@ class DashboardViewmodel @Inject constructor(
                 userMessage = exception.message ?: "An unexpected error occurred."
             )
         }
+    }
+
+    init {
+        // Set up search filtering with debounce
+        setupSearchFiltering()
+    }
+
+    @OptIn(FlowPreview::class)
+    private fun setupSearchFiltering() {
+        combine(
+            _searchQuery.debounce(300),
+            _activeTab,
+            _uiState
+        ) { query, tab, state ->
+            val filtered = state.credentials.filter { credential ->
+                val matchesQuery = query.isBlank() ||
+                        credential.website.contains(query, ignoreCase = true) ||
+                        credential.username.contains(query, ignoreCase = true) ||
+                        credential.note.contains(query, ignoreCase = true)
+
+                val matchesTab = tab == null || credential.type == tab
+
+                matchesQuery && matchesTab
+            }
+            state.copy(
+                filteredCredentials = filtered,
+                searchQuery = query,
+                activeTab = tab
+            )
+        }
+            .onEach { newState ->
+                _uiState.value = newState
+            }
+            .catch { e ->
+                Log.e("DashboardVM", "Error in search filtering", e)
+            }
+            .launchIn(viewModelScope)
+    }
+
+    /**
+     * Update search query - called from UI
+     */
+    fun updateSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
+
+    /**
+     * Set active tab filter - called from UI
+     */
+    fun setActiveTab(tab: CredentialType?) {
+        _activeTab.value = tab
     }
 
     // 3. UI-DRIVEN INITIALIZATION: The UI calls onScreenReady() when it's time to load data.
@@ -98,7 +159,11 @@ class DashboardViewmodel @Inject constructor(
             .onStart { _uiState.update { it.copy(isLoading = true) } }
             .onEach { credentials ->
                 _uiState.update {
-                    it.copy(isLoading = false, credentials = credentials)
+                    it.copy(
+                        isLoading = false,
+                        credentials = credentials,
+                        filteredCredentials = credentials // Initialize filtered with all credentials
+                    )
                 }
                 // Removed automatic call to vaultlyAutofillRepository.syncCredentials(userId)
                 // to avoid unexpected network I/O on simple navigation.

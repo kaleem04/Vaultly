@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import com.dapp.vaultly.data.model.AddPasswordUiState
 import com.dapp.vaultly.data.model.Credential
+import com.dapp.vaultly.data.model.CredentialType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -47,7 +48,8 @@ class AddPasswordViewmodel @Inject constructor() : ViewModel() {
                 website = credential.website,
                 username = credential.username,
                 password = credential.password,
-                note = credential.note
+                note = credential.note,
+                type = credential.type
             )
         }
     }
@@ -70,6 +72,10 @@ class AddPasswordViewmodel @Inject constructor() : ViewModel() {
         _uiState.update { it.copy(note = newNote) }
     }
 
+    fun onTypeChange(newType: CredentialType) {
+        _uiState.update { it.copy(type = newType) }
+    }
+
     fun togglePasswordVisibility() {
         _uiState.update { it.copy(showPassword = !it.showPassword) }
     }
@@ -78,9 +84,18 @@ class AddPasswordViewmodel @Inject constructor() : ViewModel() {
      * Validates the current input fields. The UI calls this before performing the save/update action.
      */
     fun credentialsValidation(): Boolean {
-        return _uiState.value.website.isNotBlank() &&
-                _uiState.value.username.isNotBlank() &&
-                _uiState.value.password.isNotBlank()
+        val state = _uiState.value
+        return when (state.type) {
+            CredentialType.PASSWORD -> {
+                state.website.isNotBlank() &&
+                state.username.isNotBlank() &&
+                state.password.isNotBlank()
+            }
+            CredentialType.NOTE -> {
+                state.website.isNotBlank() && // Title
+                state.note.isNotBlank()
+            }
+        }
     }
 
     /**

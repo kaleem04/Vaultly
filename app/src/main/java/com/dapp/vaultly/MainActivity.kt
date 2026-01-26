@@ -2,6 +2,7 @@ package com.dapp.vaultly
 
 import android.os.Bundle
 import android.util.Log
+import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -29,6 +30,13 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+//Security: Prevent screenshots and screen recording
+        window.setFlags(
+            WindowManager.LayoutParams.FLAG_SECURE,
+            WindowManager.LayoutParams.FLAG_SECURE
+        )
+
         val connectionType = ConnectionType.AUTOMATIC
         val projectId =
             "2606e4f31e91b2483da4fbd60d14969f" // Get Project ID at https://dashboard.reown.com/

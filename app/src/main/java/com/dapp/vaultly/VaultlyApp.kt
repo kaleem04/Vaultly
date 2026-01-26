@@ -1,9 +1,13 @@
 package com.dapp.vaultly
 
+import android.content.res.Configuration
 import android.util.Log
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -19,6 +23,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.SnackbarHost
@@ -26,7 +32,10 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -37,10 +46,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentActivity
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -97,6 +107,13 @@ fun VaultlyApp(
     // Observe lock state early so navigation composables can decide whether to render secured content
     val lockState by lockViewModel.uiState.collectAsStateWithLifecycle()
 
+    // Landscape detection
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+    // TopAppBar scroll behavior for auto-hide on scroll
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(rememberTopAppBarState())
+
     // Read the state from the ViewModel. This will trigger recomposition when it changes.
     val openAddPasswordSheet = addPasswordViewmodel.openSheet
     val shouldShowBars by remember(currentRoute) {
@@ -143,88 +160,92 @@ fun VaultlyApp(
         }
     }
 
-    Scaffold(
-        topBar = {
-            if (shouldShowBars) {
-                VaultlyTopAppBar(
-                    onSearchClick = { onSearchClick = !onSearchClick },
-                    // Assuming you have this function in your ViewModel
-                    // to set openSheet = true
-                    onAddClick = { addPasswordViewmodel.prepareForNewCredential() },
-                    isSearchActive = onSearchClick
-                )
-            }
-        },
-        bottomBar = {
-            if (shouldShowBars) {
-                VaultlyBottomAppBar(
-                    selectedItem = currentRoute ?: "",
-                    onHomeClick = { navController.navigate(VaultlyRoutes.DASHBOARDSCREEN.name) },
-                    onProfileClick = { navController.navigate(VaultlyRoutes.PROFILESCREEN.name) }
-                )
-            }
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
-    ) { paddingValues ->
-        val startDestination = when (authState) {
-            is WalletUiState.DashboardReady, is WalletUiState.DashboardPendingSignature -> VaultlyRoutes.DASHBOARDSCREEN.name
-            else -> VaultlyRoutes.WELCOMESCREEN.name
-        }
+    // Navigation callbacks
+    val onHomeClick = { navController.navigate(VaultlyRoutes.DASHBOARDSCREEN.name) }
+    val onProfileClick = { navController.navigate(VaultlyRoutes.PROFILESCREEN.name) }
 
-        NavHost(
-            navController = navController,
-            startDestination = VaultlyRoutes.SPLASHSCREEN.name
-        ) {
-            composable(VaultlyRoutes.WELCOMESCREEN.name) {
-                WelcomeScreen {
-                    navController.navigate(VaultlyRoutes.VAULTLYBOTTOMSHEET.name)
-                }
-            }
+    // Use Row layout for landscape with NavigationRail
+    if (isLandscape && shouldShowBars) {
+        Row(modifier = Modifier.fillMaxSize()) {
+            // NavigationRail on the left in landscape
+            VaultlyNavigationRail(
+                selectedItem = currentRoute ?: "",
+                onHomeClick = onHomeClick,
+                onProfileClick = onProfileClick
+            )
 
-            composable(VaultlyRoutes.SPLASHSCREEN.name) {
-                SplashScreen()
-            }
-            composable(VaultlyRoutes.VAULTLYBOTTOMSHEET.name) {
-                VaultlyBottomSheet(onDismiss = { navController.popBackStack() })
-            }
-            composable(VaultlyRoutes.DASHBOARDSCREEN.name) {
-                if (authState is WalletUiState.DashboardPendingSignature) {
-                    SignatureDialog(
-                        address = AppKit.getAccount()?.address ?: "",
-                        onConfirm = { requestPersonalSign(AppKit.getAccount()?.address ?: "") }
+            // Scaffold without bottom bar in landscape
+            Scaffold(
+                modifier = Modifier
+                    .weight(1f)
+                    .nestedScroll(scrollBehavior.nestedScrollConnection),
+                topBar = {
+                    VaultlyTopAppBar(
+                        onSearchClick = { onSearchClick = !onSearchClick },
+                        onAddClick = { addPasswordViewmodel.prepareForNewCredential() },
+                        isSearchActive = onSearchClick,
+                        scrollBehavior = scrollBehavior,
+                        showAddButton = currentRoute != VaultlyRoutes.PROFILESCREEN.name
                     )
-                } else {
-                    // Only render the dashboard when unlocked. When locked, render an empty placeholder
-                    if (lockState is LockUiState.Unlocked) {
-                        DashboardScreen(
-                            addPasswordViewmodel = addPasswordViewmodel,
-                            search = onSearchClick,
-                            contentPaddingValues = paddingValues,
-                            dashboardViewmodel = dashboardViewmodel,
-                            snackbarHostState = snackbarHostState
-                        )
-                    } else {
-                        // Placeholder while locked (keeps content from rendering)
-                        androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize()) { }
-                    }
-                }
-            }
-            composable(route = VaultlyRoutes.PROFILESCREEN.name) {
-                ProfileScreen(
+                },
+                snackbarHost = { SnackbarHost(snackbarHostState) },
+                contentWindowInsets = WindowInsets.safeDrawing
+            ) { innerPadding ->
+                VaultlyNavHost(
+                    navController = navController,
+                    authState = authState,
+                    lockState = lockState,
+                    addPasswordViewmodel = addPasswordViewmodel,
+                    dashboardViewmodel = dashboardViewmodel,
                     vaultlyThemeViewmodel = vaultlyThemeViewmodel,
-                    walletAddress = AppKit.getAccount()?.address ?: "",
-                    userName = "",
-                    onThemeClick = {},
-                    onLogoutClick = {
-                        AppKit.disconnect(
-                            onSuccess = { Log.d("@@", "Logout SuccessFull") },
-                            onError = { Log.d("@@", "Logout Failed") }
-                        )
-                        authViewmodel.onLogout()
-                    },
-                    contentPaddingValues = paddingValues
+                    authViewmodel = authViewmodel,
+                    onSearchClick = onSearchClick,
+                    snackbarHostState = snackbarHostState,
+                    paddingValues = innerPadding,
+                    isLandscape = true
                 )
             }
+        }
+    } else {
+        // Portrait mode with bottom navigation
+        Scaffold(
+            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+            topBar = {
+                if (shouldShowBars) {
+                    VaultlyTopAppBar(
+                        onSearchClick = { onSearchClick = !onSearchClick },
+                        onAddClick = { addPasswordViewmodel.prepareForNewCredential() },
+                        isSearchActive = onSearchClick,
+                        scrollBehavior = scrollBehavior,
+                        showAddButton = currentRoute != VaultlyRoutes.PROFILESCREEN.name
+                    )
+                }
+            },
+            bottomBar = {
+                if (shouldShowBars) {
+                    VaultlyBottomAppBar(
+                        selectedItem = currentRoute ?: "",
+                        onHomeClick = onHomeClick,
+                        onProfileClick = onProfileClick
+                    )
+                }
+            },
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+            contentWindowInsets = WindowInsets.safeDrawing
+        ) { innerPadding ->
+            VaultlyNavHost(
+                navController = navController,
+                authState = authState,
+                lockState = lockState,
+                addPasswordViewmodel = addPasswordViewmodel,
+                dashboardViewmodel = dashboardViewmodel,
+                vaultlyThemeViewmodel = vaultlyThemeViewmodel,
+                authViewmodel = authViewmodel,
+                onSearchClick = onSearchClick,
+                snackbarHostState = snackbarHostState,
+                paddingValues = innerPadding,
+                isLandscape = false
+            )
         }
     }
 
@@ -234,7 +255,9 @@ fun VaultlyApp(
     if (openAddPasswordSheet) {
         ModalBottomSheet(
             onDismissRequest = dismissSheet, // This is called when swiping down or pressing back.
-            sheetState = modalSheetState
+            sheetState = modalSheetState,
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.onSurface
         ) {
             AddPasswordBottomSheetContent(
                 onDismiss = dismissSheet, // This is for your internal buttons (e.g., "Save").
@@ -252,6 +275,82 @@ fun VaultlyApp(
     }
 }
 
+/**
+ * Extracted NavHost composable for reuse in both portrait and landscape layouts
+ */
+@Composable
+private fun VaultlyNavHost(
+    navController: androidx.navigation.NavHostController,
+    authState: WalletUiState,
+    lockState: LockUiState,
+    addPasswordViewmodel: AddPasswordViewmodel,
+    dashboardViewmodel: DashboardViewmodel,
+    vaultlyThemeViewmodel: VaultlyThemeViewmodel,
+    authViewmodel: AuthViewmodel,
+    onSearchClick: Boolean,
+    snackbarHostState: SnackbarHostState,
+    paddingValues: androidx.compose.foundation.layout.PaddingValues,
+    isLandscape: Boolean
+) {
+    NavHost(
+        navController = navController,
+        startDestination = VaultlyRoutes.SPLASHSCREEN.name
+    ) {
+        composable(VaultlyRoutes.WELCOMESCREEN.name) {
+            WelcomeScreen {
+                navController.navigate(VaultlyRoutes.VAULTLYBOTTOMSHEET.name)
+            }
+        }
+
+        composable(VaultlyRoutes.SPLASHSCREEN.name) {
+            SplashScreen()
+        }
+        composable(VaultlyRoutes.VAULTLYBOTTOMSHEET.name) {
+            VaultlyBottomSheet(onDismiss = { navController.popBackStack() })
+        }
+        composable(VaultlyRoutes.DASHBOARDSCREEN.name) {
+            if (authState is WalletUiState.DashboardPendingSignature) {
+                SignatureDialog(
+                    address = AppKit.getAccount()?.address ?: "",
+                    onConfirm = { requestPersonalSign(AppKit.getAccount()?.address ?: "") }
+                )
+            } else {
+                // Only render the dashboard when unlocked. When locked, render an empty placeholder
+                if (lockState is LockUiState.Unlocked) {
+                    DashboardScreen(
+                        addPasswordViewmodel = addPasswordViewmodel,
+                        search = onSearchClick,
+                        contentPaddingValues = paddingValues,
+                        dashboardViewmodel = dashboardViewmodel,
+                        snackbarHostState = snackbarHostState,
+                        isLandscape = isLandscape
+                    )
+                } else {
+                    // Placeholder while locked (keeps content from rendering)
+                    androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize()) { }
+                }
+            }
+        }
+        composable(route = VaultlyRoutes.PROFILESCREEN.name) {
+            ProfileScreen(
+                vaultlyThemeViewmodel = vaultlyThemeViewmodel,
+                walletAddress = AppKit.getAccount()?.address ?: "",
+                userName = "",
+                onThemeClick = {},
+                onLogoutClick = {
+                    AppKit.disconnect(
+                        onSuccess = { Log.d("@@", "Logout SuccessFull") },
+                        onError = { Log.d("@@", "Logout Failed") }
+                    )
+                    authViewmodel.onLogout()
+                },
+                contentPaddingValues = paddingValues
+            )
+        }
+    }
+}
+
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -262,7 +361,9 @@ fun VaultlyBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        modifier = modifier
+        modifier = modifier,
+        containerColor = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface
     ) {
         AppKitComponent(true) {
             onDismiss()
@@ -320,11 +421,7 @@ fun VaultDockedSearchBar(
         tonalElevation = SearchBarDefaults.TonalElevation,
         shadowElevation = SearchBarDefaults.ShadowElevation,
     ) {
-        Text(
-            "Recent searches will go here",
-            fontSize = 10.sp,
-            modifier = Modifier.padding(16.dp)
-        )
+        // Empty content - no recent searches
     }
 }
 
@@ -333,7 +430,9 @@ fun VaultDockedSearchBar(
 fun VaultlyTopAppBar(
     onSearchClick: () -> Unit,
     onAddClick: () -> Unit,
-    isSearchActive: Boolean = false
+    isSearchActive: Boolean = false,
+    scrollBehavior: TopAppBarScrollBehavior? = null,
+    showAddButton: Boolean = true
 ) {
     TopAppBar(
         title = {
@@ -350,11 +449,39 @@ fun VaultlyTopAppBar(
                     contentDescription = "Search"
                 )
             }
-            IconButton(onClick = onAddClick) {
-                Icon(Icons.Default.Add, contentDescription = "Add Password")
+            if (showAddButton) {
+                IconButton(onClick = onAddClick) {
+                    Icon(Icons.Default.Add, contentDescription = "Add Password")
+                }
             }
-        }
+        },
+        scrollBehavior = scrollBehavior
     )
+}
+
+/**
+ * NavigationRail for landscape mode - displays on the left side
+ */
+@Composable
+fun VaultlyNavigationRail(
+    selectedItem: String,
+    onHomeClick: () -> Unit,
+    onProfileClick: () -> Unit
+) {
+    NavigationRail {
+        NavigationRailItem(
+            selected = selectedItem == VaultlyRoutes.DASHBOARDSCREEN.name,
+            onClick = onHomeClick,
+            icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
+            label = { Text("Home") }
+        )
+        NavigationRailItem(
+            selected = selectedItem == VaultlyRoutes.PROFILESCREEN.name,
+            onClick = onProfileClick,
+            icon = { Icon(Icons.Default.Person, contentDescription = "Profile") },
+            label = { Text("Profile") }
+        )
+    }
 }
 
 @Composable
